@@ -1,0 +1,1 @@
+<div id="flash-region" class="toast-region" aria-live="polite" aria-atomic="false"></div>
