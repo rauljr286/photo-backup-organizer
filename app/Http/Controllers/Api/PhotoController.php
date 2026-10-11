@@ -32,7 +32,7 @@ class PhotoController extends Controller
             'tags' => ['nullable'],
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
-            'trashed' => ['nullable', 'boolean'],
+            'archived' => ['nullable', 'boolean'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -72,31 +72,32 @@ class PhotoController extends Controller
     }
 
     /**
-     * Move a photo to the trash (soft delete, reversible).
+     * Move a photo to the archive (reversible; users can never permanently
+     * delete their own photos).
      */
-    public function destroy(Request $request, Photo $photo): JsonResponse
+    public function archive(Request $request, Photo $photo): JsonResponse
     {
         $this->authorizePhoto($request, $photo);
 
-        $this->photos->trash($photo);
+        $this->photos->archive($photo);
 
         return response()->json([
-            'message' => 'Photo moved to trash. You can restore it within the retention window.',
-            'trashed_at' => $photo->deleted_at?->toISOString(),
+            'message' => 'Photo archived.',
+            'archived_at' => $photo->fresh()->archived_at?->toISOString(),
         ]);
     }
 
     /**
-     * Restore a photo from the trash.
+     * Restore a photo from the archive.
      */
-    public function restore(Request $request, Photo $photo): JsonResponse
+    public function unarchive(Request $request, Photo $photo): JsonResponse
     {
         $this->authorizePhoto($request, $photo);
 
-        $this->photos->restore($photo);
+        $this->photos->unarchive($photo);
 
         return response()->json([
-            'message' => 'Photo restored from trash.',
+            'message' => 'Photo restored from archive.',
         ]);
     }
 
@@ -136,7 +137,7 @@ class PhotoController extends Controller
             'tags' => $photo->tags ?? [],
             'taken_at' => $photo->taken_at?->toISOString(),
             'uploaded_at' => $photo->created_at?->toISOString(),
-            'deleted_at' => $photo->deleted_at?->toISOString(),
+            'archived_at' => $photo->archived_at?->toISOString(),
             'size_bytes' => $photo->size_bytes,
             'mime_type' => $photo->mime_type,
             'backed_up' => $photo->isBackedUp(),

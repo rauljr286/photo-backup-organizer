@@ -1,12 +1,17 @@
 <x-app-layout :title="$album->name">
-    <div class="dashboard">
-        <div class="dashboard__top">
-            <div>
-                <a class="link" href="{{ route('albums.index') }}">&larr; All albums</a>
-                <h1 class="page-title">{{ $album->name }}</h1>
-                <p class="page-subtitle">{{ $photos->total() }} photo(s) in this album &middot; created {{ $album->created_at?->format('M j, Y') }}</p>
+    <div class="dashboard dashboard--stack">
+        <div class="section-head">
+            <span class="section-head__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </span>
+            <div class="section-head__text">
+                <a class="link section-head__back" href="{{ route('albums.index') }}">&larr; All albums</a>
+                <h1 class="section-head__title">{{ $album->name }}</h1>
+                <p class="section-head__subtitle">{{ $photos->total() }} photo(s) in this album &middot; created {{ $album->created_at?->format('M j, Y') }}</p>
             </div>
-            <div class="dashboard__top-actions">
+            <div class="section-head__actions dashboard__top-actions">
                 <a class="btn btn--primary" href="{{ route('albums.download', $album) }}">Download ZIP</a>
                 <a class="btn btn--secondary" href="{{ route('dashboard', ['album' => $album->id]) }}">Open in photo grid</a>
             </div>

@@ -13,12 +13,19 @@
 /.zed
 /auth.json
 /node_modules
-/public/build
 /public/hot
 /public/storage
 /storage/*.key
+/storage/app/public
+/storage/app/private
 /storage/pail
 /vendor
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Ignore generated Laravel cache files
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/storage/framework/cache/data/*
+!/storage/framework/cache/data/.gitignore

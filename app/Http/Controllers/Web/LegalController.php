@@ -13,7 +13,6 @@ class LegalController extends Controller
     public function privacy(): View
     {
         return view('legal.privacy', [
-            'retentionDays' => (int) config('photobackup.trash_retention_days', 30),
             'supportEmail' => config('photobackup.support_email', 'support@example.com'),
         ]);
     }

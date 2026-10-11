@@ -2,26 +2,25 @@
     <div class="photo-page">
         <div class="dashboard__top">
             <div>
-                <a class="link" href="{{ url()->previous() !== url()->current() ? url()->previous() : route('dashboard') }}">&larr; Back to photos</a>
                 <h1 class="page-title">{{ $photo->original_filename }}</h1>
-                @if ($photo->trashed())
-                    <p class="page-subtitle">This photo is in the trash.</p>
+                @if ($photo->isArchived())
+                    <p class="page-subtitle">This photo is archived.</p>
                 @endif
             </div>
 
             <div class="dashboard__top-actions">
                 <a class="btn btn--primary" href="{{ route('photos.download', $photo) }}">Download photo</a>
 
-                @if ($photo->trashed())
-                    <form method="POST" action="{{ route('photos.restore', $photo) }}" class="inline-form">
+                @if ($photo->isArchived())
+                    <form method="POST" action="{{ route('photos.unarchive', $photo) }}" class="inline-form">
                         @csrf
-                        <button type="submit" class="btn btn--secondary">Restore from trash</button>
+                        <button type="submit" class="btn btn--secondary">Restore from archive</button>
                     </form>
                 @else
-                    <form method="POST" action="{{ route('photos.trash', $photo) }}" class="inline-form js-trash-photo-form">
+                    <form method="POST" action="{{ route('photos.archive', $photo) }}" class="inline-form js-archive-photo-form">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn btn--danger-ghost">Move to trash</button>
+                        <button type="submit" class="btn btn--danger-ghost">Archive</button>
                     </form>
                 @endif
             </div>
@@ -31,8 +30,22 @@
             <h2 class="visually-hidden" id="viewer-heading">Zoomable photo preview</h2>
 
             <div class="viewer__stage" id="zoom-stage">
-                <img id="zoom-image" class="viewer__image" src="{{ $photo->url() }}" alt="{{ $photo->description() }}"
+                <img id="zoom-image" class="viewer__image" src="{{ $photo->url() }}?v={{ $photo->updated_at?->timestamp ?? 0 }}" alt="{{ $photo->description() }}"
                      data-zoom-level="1">
+
+                @if ($prevPhoto)
+                    <a class="viewer__nav viewer__nav--prev" href="{{ route('photos.show', $prevPhoto) }}"
+                       aria-label="Previous photo">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="15 18 9 12 15 6"/></svg>
+                    </a>
+                @endif
+
+                @if ($nextPhoto)
+                    <a class="viewer__nav viewer__nav--next" href="{{ route('photos.show', $nextPhoto) }}"
+                       aria-label="Next photo">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="9 18 15 12 9 6"/></svg>
+                    </a>
+                @endif
             </div>
 
             <div class="viewer__controls">
@@ -41,6 +54,7 @@
                 <button type="button" class="btn btn--ghost btn--sm" id="zoom-reset" aria-label="Reset zoom level">Reset zoom</button>
                 <span class="viewer__zoom-level" id="zoom-level" role="status">100%</span>
             </div>
+            <p class="viewer__hint">Tip: browse photos with the arrow buttons or the &larr; &rarr; arrow keys.</p>
         </section>
 
         <div class="photo-meta-grid">
@@ -69,7 +83,7 @@
                             @if ($photo->isBackedUp())
                                 Backed up on {{ $photo->backed_up_at->format('M j, Y') }}
                             @else
-                                {{ $photo->trashed() ? 'Skipped (in trash)' : 'Not yet backed up' }}
+                                {{ $photo->isArchived() ? 'Skipped (archived)' : 'Not yet backed up' }}
                             @endif
                         </dd>
                     </div>
@@ -148,25 +162,5 @@
                 @endif
             </section>
         </div>
-
-        @if ($photo->trashed())
-            <section class="panel panel--danger" aria-labelledby="purge-heading">
-                <h2 class="panel__heading" id="purge-heading">Permanently delete</h2>
-                <p>
-                    This deletes the photo forever after the {{ config('photobackup.trash_retention_days', 30) }}-day trash window. Type
-                    <strong>DELETE</strong> to confirm.
-                </p>
-                <form method="POST" action="{{ route('photos.purge', $photo) }}" class="form form--row" id="purge-form">
-                    @csrf
-                    @method('DELETE')
-                    <div class="field field--grow">
-                        <label class="visually-hidden" for="confirm_text">Type DELETE to confirm</label>
-                        <input class="field__input" id="confirm_text" type="text" name="confirm_text" autocomplete="off" required
-                               placeholder="Type DELETE to confirm">
-                    </div>
-                    <button type="submit" class="btn btn--danger">Delete permanently</button>
-                </form>
-            </section>
-        @endif
     </div>
 </x-app-layout>

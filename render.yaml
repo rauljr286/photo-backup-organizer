@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: photo-backup-organizer
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /up
+    autoDeploy: true
+    envVars:
+      - key: APP_NAME
+        value: Photo Backup Organizer
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      # The first render subdomain Render gives you, e.g.
+      # https://photo-backup-organizer.onrender.com. Update this after deploy
+      # if your subdomain differs, and set it again if you add a custom domain.
+      - key: APP_URL
+        value: https://photo-backup-organizer.onrender.com
+      - key: APP_KEY
+        generateValue: true
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_URL
+        fromDatabase:
+          name: photo-backup-db
+          property: connectionString
+      - key: SESSION_DRIVER
+        value: database
+      - key: CACHE_STORE
+        value: database
+      - key: QUEUE_CONNECTION
+        value: sync
+      - key: PHOTOS_CLOUD_DISK
+        value: ""
+      - key: PHOTOS_LOCAL_MIRROR_DISK
+        value: local
+      - key: PHOTOS_MAX_UPLOAD_MB
+        value: "20"
+
+databases:
+  - name: photo-backup-db
+    plan: free

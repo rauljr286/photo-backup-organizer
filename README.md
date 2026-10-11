@@ -1,14 +1,14 @@
 # Photo Backup Organizer
 
-A private, per-user photo backup and organization web app built with **Laravel 13**, **MySQL**, and a hand-written, WCAG 2.1 AA accessible front end. Upload photos in bulk, organize them into albums, tag and search them, preview/zoom, download or export them, and recover deleted photos from a 30-day trash — plus a token-authenticated JSON API.
+A private, per-user photo backup and organization web app built with **Laravel 13**, **MySQL**, and a hand-written, WCAG 2.1 AA accessible front end. Upload photos in bulk, organize them into albums, tag and search them, preview/zoom, download or export them, and archive photos you want to hide from your library — plus a token-authenticated JSON API.
 
 ## Features
 
-- **Authentication** — email/password registration, login, logout, and password reset (reset link is written to the log in local development via `MAIL_MAILER=log`).
+- **Authentication** — email/password registration, login, and logout; signed-in users can change their password from Settings.
 - **Bulk upload** — drag-and-drop or file picker, per-file progress, client- and server-side size/type validation, and alt text capture.
 - **Organization** — albums (create/rename/delete; deleting an album keeps its photos), tags, search, and date-range filters.
 - **Viewing** — responsive photo grid and a detail page with zoom, metadata, alt-text editing, tags, and album assignment.
-- **Trash** — deletes are reversible for 30 days with an Undo toast; permanent deletion requires typing `DELETE`. A scheduled command purges expired items.
+- **Archive** — move photos you want to keep but hide to an Archive page with an Undo toast; you can restore them at any time. Users cannot permanently delete their own photos.
 - **Download & export** — single-photo download and per-album ZIP export.
 - **Storage meter** — a per-user quota (default 5 GB) shown as an accessible meter.
 - **Cloud backup** — "Back Up Now" pushes photos to an S3-compatible disk, or mirrors them locally when no cloud disk is configured.
@@ -105,13 +105,43 @@ Beyond the standard Laravel keys, the app reads:
 | ---------------------------- | ---------------------- | --------------------------------------------------- |
 | `PHOTOS_CLOUD_DISK`          | *(empty)*              | Disk name for backups, e.g. `s3`. Empty = local mirror. |
 | `PHOTOS_LOCAL_MIRROR_DISK`   | `local`                | Disk used to mirror backups when no cloud disk is set. |
-| `PHOTOS_TRASH_RETENTION_DAYS`| `30`                   | How long trashed photos are kept before purging.    |
 | `PHOTOS_MAX_UPLOAD_MB`       | `20`                   | Maximum size of a single uploaded photo (MB).       |
 | `PHOTOS_SUPPORT_EMAIL`       | `support@example.com`  | Support address shown on legal pages.               |
 
 ### Enabling real cloud backup
 
 Set `PHOTOS_CLOUD_DISK=s3` and configure the `AWS_*` keys, then add an `s3` disk in `config/filesystems.php` (or install `league/flysystem-aws-s3-v3`). With no cloud disk configured, "Back Up Now" mirrors files to the `local` (private) disk so the flow works offline.
+
+## Deploying to Render (free)
+
+The repository ships a `render.yaml` blueprint: a Docker web service (PHP 8.3 +
+Apache + PostgreSQL) and a free Postgres database. Push the repo to GitHub,
+then in Render use **New → Blueprint** and select the repository — the
+blueprint provisions the database, builds the Dockerfile, and deploys.
+
+1. **Create a repository** on [GitHub](https://github.com) and push this folder
+   (Git is not required — GitHub's web upload works too). The compiled assets
+   in `public/build` must be included; `.env`, `vendor/`, `node_modules/` and
+   `storage/app/*` are excluded automatically.
+2. **Deploy:** Render → **New → Blueprint** → pick the repo. Wait for the build
+   and the `php artisan migrate` step (part of the container startup).
+3. **Fix `APP_URL`** in the service's **Environment** tab so it matches the
+   exact subdomain Render assigned (e.g. `https://photo-backup-organizer.onrender.com`),
+   then redeploy.
+4. Open the live URL and register an account.
+
+Free-tier notes:
+
+- The **free Postgres database expires after 30 days**. Before it expires,
+  `pg_dump` it, or create a free database on
+  [Neon](https://neon.tech) and paste its connection string into the service's
+  `DB_URL` environment variable instead.
+- Free web services spin down after ~15 minutes without traffic and take about
+  a minute to restart on the next request (the `/up` health route handles
+  Render's health checks).
+- Uploads are stored in the container's ephemeral disk, so they are lost on a
+  new deploy. For persistence set `PHOTOS_CLOUD_DISK=s3` and the matching
+  `AWS_*` keys (see "Enabling real cloud backup").
 
 ## Testing
 
@@ -121,7 +151,7 @@ The suite runs against an in-memory SQLite database (configured in `phpunit.xml`
 php artisan test
 ```
 
-Coverage includes authentication (web + API), uploads and validation, ownership/authorization, trash → restore → purge, search and tag filtering, cloud-mirror backup, and album create/rename/delete/ZIP export.
+Coverage includes authentication (web + API), uploads and validation, ownership/authorization, archive → restore, search and tag filtering, cloud-mirror backup, and album create/rename/delete/ZIP export.
 
 ## API
 
@@ -137,8 +167,8 @@ Base path `/api`. Public: `POST /api/register`, `POST /api/login`. All other rou
 | POST   | `/api/photos`                         | Upload one or more photos         |
 | GET    | `/api/photos/{photo}`                 | Photo details                     |
 | GET    | `/api/photos/{photo}/raw`             | Stream the image                  |
-| DELETE | `/api/photos/{photo}`                 | Move to trash                     |
-| POST   | `/api/photos/{photo}/restore`         | Restore from trash                |
+| DELETE | `/api/photos/{photo}`                 | Move to archive                  |
+| POST   | `/api/photos/{photo}/unarchive`       | Restore from archive             |
 | GET    | `/api/albums`                         | List albums                       |
 | POST   | `/api/albums`                         | Create an album                   |
 | PUT    | `/api/albums/{album}`                 | Rename an album                   |
@@ -146,30 +176,55 @@ Base path `/api`. Public: `POST /api/register`, `POST /api/login`. All other rou
 | POST   | `/api/albums/{album}/photos/{photo}`  | Add a photo to an album           |
 | DELETE | `/api/albums/{album}/photos/{photo}`  | Remove a photo from an album      |
 
-## Trash purge schedule
+## Migrating legacy trashed photos
 
-`photos:purge-trash` permanently deletes photos whose retention window has elapsed. It is scheduled daily in `routes/console.php`; run it manually with:
+Photos soft-deleted before the archive system existed can be moved to the archive with:
 
 ```shell
-php artisan photos:purge-trash
+php artisan photos:migrate-trashed-to-archived
 ```
 
-For scheduled commands to run automatically, ensure the Laravel scheduler is executed every minute (`php artisan schedule:run` via Task Scheduler/Laragon cron), or use `php artisan schedule:work` during development.
+## Theming (light / dark)
+
+The whole interface ships with a light and a dark theme driven by CSS custom
+properties. Light values live on `:root`; the dark overrides live under
+`[data-theme='dark']` (both in `resources/css/app.css`).
+
+- **Default** follows the operating system via `prefers-color-scheme`.
+- **Manual choice** is stored in `localStorage` under the key `pbo-theme`
+  (`'light'` or `'dark'`) and overrides the OS setting.
+- **No flash**: an inline script in the document `<head>` (the
+  `<x-theme-head />` component, included by every layout) resolves and applies
+  the theme before the first paint; `color-scheme` is set in CSS and via a
+  `<meta name="color-scheme">` tag so native controls match.
+- **Toggle**: the reusable `<x-theme-toggle />` component renders an accessible
+  sun/moon button (44px touch target, changing `aria-label`/`aria-pressed`). It
+  appears in the app navbar, in the mobile sidebar menu (labelled), and in the
+  landing header. Because the preference is shared, the guest/auth pages use the
+  resolved theme without rendering their own control. Multiple tabs stay in sync
+  through the `storage` event.
+- **Transitions**: surfaces cross-fade for ~200ms on theme change, and are
+  instant under `prefers-reduced-motion: reduce`.
+
+A few decorative colours are intentionally fixed and do not change with the
+theme: the teal-to-mint brand gradients (header, hero, brand buttons), the
+illustrated camera on the landing page, the album accent bars, the large
+photo-viewer stage, and the lightbox backdrop. User photos and thumbnails are
+never filtered, tinted or dimmed by either theme.
 
 ## Accessibility
 
-The UI targets **WCAG 2.1 AA**: a skip link, a visible 3px focus outline, labelled form controls, descriptive alt text on every meaningful image, action-based button labels, `aria-live` status toasts, native `<dialog>` confirmations, a `role="meter"` storage bar, password show/hide toggles with `aria-pressed` state, semantic headings, and a contrast-checked color palette. All colors live in `:root` custom properties in `resources/css/app.css` (an indigo-violet gradient identity for the header, buttons, badges, and guest pages; every text/background pairing used is checked against the 4.5:1 / 3:1 contrast ratios).
+The UI targets **WCAG 2.1 AA**: a skip link, a visible 3px focus outline, labelled form controls, descriptive alt text on every meaningful image, action-based button labels, `aria-live` status toasts, native `<dialog>` confirmations, a `role="meter"` storage bar, password show/hide toggles with `aria-pressed` state, semantic headings, and a contrast-checked color palette. All colors live as custom properties in `resources/css/app.css` (`:root` for light, `[data-theme='dark']` for dark), with a teal-to-mint gradient identity for the header, buttons, badges, and guest pages; every text/background pairing used in both themes is checked against the 4.5:1 / 3:1 contrast ratios.
 
 ## Project structure
 
 ```
 app/
-├── Console/Commands/PurgeTrashCommand.php   # scheduled trash purge
+├── Console/Commands/MigrateTrashedPhotosToArchived.php   # one-time deleted_at → archived_at migration
 ├── Http/
 │   ├── Controllers/Api/                     # token-authenticated JSON API
 │   ├── Controllers/Web/                     # session-based web UI
 │   └── Requests/                            # form request validation
-├── Mail/PasswordResetLink.php
 ├── Models/{User,Photo,Album}.php
 └── Services/PhotoStorageService.php         # all upload/backup/query logic
 config/photobackup.php                        # app-specific configuration

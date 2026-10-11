@@ -19,12 +19,6 @@ return [
     'local_mirror_disk' => env('PHOTOS_LOCAL_MIRROR_DISK', 'local'),
 
     /*
-    | Number of days a photo stays in the trash before it is permanently
-    | deleted (see the purge-trash scheduled command).
-    */
-    'trash_retention_days' => env('PHOTOS_TRASH_RETENTION_DAYS', 30),
-
-    /*
     | Maximum size of a single uploaded photo, in megabytes.
     */
     'max_upload_mb' => env('PHOTOS_MAX_UPLOAD_MB', 20),
@@ -33,5 +27,16 @@ return [
     | Contact address shown in the in-app privacy policy.
     */
     'support_email' => env('PHOTOS_SUPPORT_EMAIL', 'support@example.com'),
+
+    /*
+    | Social profiles linked from the site footer. Replace the defaults with
+    | your real profile URLs, or set a value to an empty string to hide its icon.
+    */
+    'social' => [
+        'facebook' => env('PHOTOS_SOCIAL_FACEBOOK', 'https://www.facebook.com'),
+        'instagram' => env('PHOTOS_SOCIAL_INSTAGRAM', 'https://www.instagram.com'),
+        'twitter' => env('PHOTOS_SOCIAL_TWITTER', 'https://twitter.com'),
+        'linkedin' => env('PHOTOS_SOCIAL_LINKEDIN', 'https://www.linkedin.com'),
+    ],
 
 ];

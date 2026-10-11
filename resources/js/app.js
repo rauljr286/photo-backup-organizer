@@ -1,7 +1,7 @@
-/* Photo Backup Organizer front-end behaviour
+﻿/* Photo Backup Organizer front-end behaviour
  * - drag-and-drop uploads with per-file progress (XHR)
- * - delete with undo toast (short recovery window)
- * - bulk select + delete
+ * - archive with undo toast (short recovery window)
+ * - bulk select + archive
  * - dialogs (native <dialog>), rename / delete confirmations
  * - photo zoom controls and debounced filters
  */
@@ -344,7 +344,7 @@ function createUploadItem(file, list, { nextKey, onRetry }) {
 
     const status = document.createElement('span');
     status.className = 'upload-item__status';
-    status.textContent = 'Queued…';
+    status.textContent = 'Queuedâ€¦';
 
     li.append(name, track, status);
     list.prepend(li);
@@ -360,7 +360,7 @@ function createUploadItem(file, list, { nextKey, onRetry }) {
 
     entry.setQueued = () => {
         entry.bar.style.width = '0';
-        entry.status.textContent = 'Queued…';
+        entry.status.textContent = 'Queuedâ€¦';
         entry.status.title = file.name;
         li.classList.remove('is-failed', 'is-done');
         bar.classList.remove('is-failed');
@@ -412,19 +412,13 @@ function refreshGrid(uploaded) {
 
 function photoCardHtml(photo) {
     return `
-    <figure class="photo-card" data-photo-id="${photo.id}">
+    <figure class="photo-card" data-photo-id="${photo.id}" data-archive-url="/photos/${photo.id}" data-restore-url="/photos/${photo.id}/unarchive">
       <a class="photo-card__media" href="/photos/${photo.id}">
         <img class="photo-card__img" src="${photo.thumbnail_url || photo.url}" alt="${escapeHtml(photo.description)}" loading="lazy">
       </a>
       <figcaption class="photo-card__caption">
         <span class="photo-card__date">Uploaded just now</span>
       </figcaption>
-      <div class="photo-card__actions">
-        <a class="btn btn--ghost btn--sm" href="/photos/${photo.id}">View &amp; zoom</a>
-        <button type="button" class="btn btn--danger-ghost btn--sm js-delete-photo"
-          data-url="/photos/${photo.id}" data-restore-url="/photos/${photo.id}/restore"
-          aria-label="Move ${escapeHtml(photo.description)} to trash">Delete</button>
-      </div>
     </figure>`;
 }
 
@@ -432,41 +426,6 @@ function escapeHtml(value) {
     const div = document.createElement('div');
     div.textContent = String(value ?? '');
     return div.innerHTML;
-}
-
-/* ---------------- Delete with undo ---------------- */
-
-function initDeletes() {
-    document.addEventListener('click', (e) => {
-        const button = e.target.closest('.js-delete-photo');
-        if (!button) return;
-
-        const card = button.closest('.photo-card');
-        if (!card) return;
-
-        e.preventDefault();
-        button.disabled = true;
-
-        postJson(button.dataset.url, 'DELETE')
-            .then((data) => {
-                card.classList.add('is-trashed');
-                card.style.opacity = '0.5';
-                card.querySelectorAll('button, a').forEach((el) => {
-                    if (!el.closest('.js-delete-photo')) el.style.pointerEvents = 'none';
-                });
-
-                showToast(data?.message || 'Photo moved to trash.', {
-                    actionLabel: 'Undo',
-                    actionUrl: button.dataset.restoreUrl,
-                    actionMethod: 'POST',
-                    onAction: () => window.location.reload(),
-                });
-            })
-            .catch((err) => {
-                button.disabled = false;
-                showToast(err.message, { tone: 'error' });
-            });
-    });
 }
 
 /* ---------------- Bulk selection ---------------- */
@@ -509,13 +468,13 @@ function initBulkSelect() {
 
     document.getElementById('clear-selected')?.addEventListener('click', clear);
 
-    document.getElementById('delete-selected')?.addEventListener('click', () => {
+    document.getElementById('archive-selected')?.addEventListener('click', () => {
         const boxes = grid ? Array.from(grid.querySelectorAll('.js-select-photo:checked')) : [];
         if (!boxes.length) return;
 
-        const dialog = document.getElementById('bulk-delete-dialog');
-        const form = document.getElementById('bulk-delete-form');
-        const name = document.getElementById('bulk-delete-name');
+        const dialog = document.getElementById('bulk-archive-dialog');
+        const form = document.getElementById('bulk-archive-form');
+        const name = document.getElementById('bulk-archive-name');
 
         if (dialog && dialog.showModal) {
             if (name) name.textContent = boxes.length;
@@ -523,7 +482,7 @@ function initBulkSelect() {
             if (form) {
                 form.onsubmit = (e) => {
                     e.preventDefault();
-                    const urls = boxes.map((box) => box.closest('.photo-card')?.querySelector('.js-delete-photo')?.dataset.url).filter(Boolean);
+                    const urls = boxes.map((box) => box.closest('.photo-card')?.dataset.archiveUrl).filter(Boolean);
                     Promise.all(urls.map((url) => postJson(url, 'DELETE')))
                         .then(() => {
                             boxes.forEach((box) => box.closest('.photo-card')?.remove());
@@ -534,9 +493,9 @@ function initBulkSelect() {
                         .catch((err) => showToast(err.message, { tone: 'error' }));
                 };
             }
-        } else {
-            if (!window.confirm(`Delete ${boxes.length} selected photo(s)?`)) return;
-            const urls = boxes.map((box) => box.closest('.photo-card')?.querySelector('.js-delete-photo')?.dataset.url).filter(Boolean);
+} else {
+            if (!window.confirm(`Archive ${boxes.length} selected photo(s)?`)) return;
+            const urls = boxes.map((box) => box.closest('.photo-card')?.dataset.archiveUrl).filter(Boolean);
             Promise.all(urls.map((url) => postJson(url, 'DELETE')))
                 .then(() => {
                     boxes.forEach((box) => box.closest('.photo-card')?.remove());
@@ -545,6 +504,42 @@ function initBulkSelect() {
                 })
                 .catch((err) => showToast(err.message, { tone: 'error' }));
         }
+    });
+
+    document.getElementById('edit-selected')?.addEventListener('click', () => {
+        const boxes = grid ? Array.from(grid.querySelectorAll('.js-select-photo:checked')) : [];
+        if (!boxes.length) return;
+
+        const dialog = document.getElementById('bulk-edit-dialog');
+        const form = document.getElementById('bulk-edit-form');
+        const name = document.getElementById('bulk-edit-name');
+
+        if (!dialog || !form || !dialog.showModal) return;
+
+        if (name) name.textContent = boxes.length;
+        form.reset();
+        dialog.showModal();
+
+        form.onsubmit = (e) => {
+            e.preventDefault();
+
+            const altText = form.querySelector('[name="alt_text"]').value;
+            const tags = form.querySelector('[name="tags"]').value;
+            const album = form.querySelector('[name="album"]').value;
+
+            postJson(form.dataset.url, 'POST', {
+                ids: boxes.map((box) => box.value),
+                alt_text: altText,
+                tags,
+                album: album || null,
+            })
+                .then((data) => {
+                    dialog.close();
+                    showToast(data.message || 'Selected photos updated.');
+                    window.location.reload();
+                })
+                .catch((err) => showToast(err.message, { tone: 'error' }));
+        };
     });
 }
 
@@ -577,18 +572,6 @@ function initDialogs() {
             const dialog = document.getElementById('delete-dialog');
             const form = document.getElementById('delete-form');
             const name = document.getElementById('delete-dialog-name');
-            if (!dialog || !form || !name) return;
-            form.action = btn.dataset.url;
-            name.textContent = `"${btn.dataset.name}"`;
-            dialog.showModal();
-        });
-    });
-
-    document.querySelectorAll('.js-purge-photo').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const dialog = document.getElementById('purge-dialog');
-            const form = document.getElementById('purge-form');
-            const name = document.getElementById('purge-dialog-name');
             if (!dialog || !form || !name) return;
             form.action = btn.dataset.url;
             name.textContent = `"${btn.dataset.name}"`;
@@ -651,10 +634,22 @@ function initZoom() {
             e.preventDefault();
             scale = Math.max(scale - 0.5, 1);
             apply();
-        } else if (e.key === '0') {
+} else if (e.key === '0') {
             scale = 1;
             apply();
-        }
+        } else if (e.key === 'ArrowLeft') {
+            const prev = document.querySelector('.viewer__nav--prev');
+            if (prev) {
+                e.preventDefault();
+                prev.click();
+            }
+        } else if (e.key === 'ArrowRight') {
+            const next = document.querySelector('.viewer__nav--next');
+            if (next) {
+                e.preventDefault();
+                next.click();
+            }
+}
     });
 }
 
@@ -696,10 +691,13 @@ function initPasswordToggles() {
             input.id = `password-${Math.random().toString(36).slice(2, 8)}`;
         }
 
-        const wrapper = document.createElement('div');
-        wrapper.className = 'field__password';
-        input.parentNode.insertBefore(wrapper, input);
-        wrapper.appendChild(input);
+const wrapper = input.closest('.field__password') || (() => {
+            const w = document.createElement('div');
+            w.className = 'field__password';
+            input.parentNode.insertBefore(w, input);
+            w.appendChild(input);
+            return w;
+        })();
 
         const button = document.createElement('button');
         button.type = 'button';
@@ -779,6 +777,43 @@ function initSidebar() {
             if (!e.matches) setState(false);
         });
     }
+}
+
+/* ---------------- Topbar user menu ---------------- */
+
+function initUserMenu() {
+    const menu = document.querySelector('[data-user-menu]');
+    if (!menu) return;
+
+    const trigger = menu.querySelector('[data-user-menu-trigger]');
+    const panel = menu.querySelector('[data-user-menu-panel]');
+    if (!trigger || !panel) return;
+
+    const isOpen = () => menu.classList.contains('is-open');
+    const setOpen = (open) => {
+        menu.classList.toggle('is-open', open);
+        trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+        panel.hidden = !open;
+    };
+
+    trigger.addEventListener('click', () => setOpen(!isOpen()));
+
+    document.addEventListener('click', (e) => {
+        if (isOpen() && !menu.contains(e.target)) setOpen(false);
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && isOpen()) {
+            setOpen(false);
+            trigger.focus();
+        }
+    });
+
+    // Following a link (e.g. settings) dismisses the menu; the theme toggle
+    // and the sign-out button intentionally keep it open.
+    panel.addEventListener('click', (e) => {
+        if (e.target.closest('a')) setOpen(false);
+    });
 }
 
 /* ---------------- Avatar upload ---------------- */
@@ -896,33 +931,51 @@ function initRegisterAgreement() {
     const box = document.querySelector('[data-terms-scroll]');
     const agree = document.querySelector('[data-terms-agree]');
     const hint = document.querySelector('[data-terms-hint]');
+    const progress = document.querySelector('[data-terms-progress]');
+    const progressBar = document.querySelector('[data-terms-progress-bar]');
     if (!box || !agree) return;
 
     const SCROLL_TOLERANCE = 2;
 
+    const maxScroll = () => Math.max(box.scrollHeight - box.clientHeight, 0);
     const atBottom = () => box.scrollTop + box.clientHeight >= box.scrollHeight - SCROLL_TOLERANCE;
 
     const sync = () => {
         const reached = atBottom();
+        const max = maxScroll();
+        const percent = max <= 0 ? 100 : Math.min(100, Math.round((box.scrollTop / max) * 100));
+
         agree.disabled = !reached;
         agree.setAttribute('aria-disabled', String(!reached));
         if (hint) hint.hidden = reached;
+        if (progressBar) progressBar.style.width = percent + '%';
+        if (progress) progress.setAttribute('aria-valuenow', String(reached ? 100 : percent));
     };
 
     box.addEventListener('scroll', sync, { passive: true });
     window.addEventListener('resize', sync);
 
     sync();
-    box.focus({ preventScroll: true });
+
+    // The gate lives inside the sign-up pane. Only pull focus to the terms box
+    // when that pane is the one on screen, so a hidden pane never steals focus.
+    const pane = box.closest('[data-auth-pane]');
+    const card = box.closest('[data-auth-card]');
+    const isActive = !pane || !card || card.dataset.state === pane.dataset.authPane;
+    if (isActive && box.offsetParent !== null) {
+        box.focus({ preventScroll: true });
+    }
 }
 
 /* ---------------- Toast feedback from server flashes ---------------- */
 
-/* Server-rendered success flashes (album created/renamed/deleted, trash/restore,
- * profile updated, password changed, backup summary…) are promoted into the
+/* Server-rendered success flashes (album created/renamed/deleted, archive/restore,
+ * profile updated, password changed, backup summaryâ€¦) are promoted into the
  * stackable toast system so every action gets consistent, auto-dismissing
  * feedback. Validation error lists stay inline so they can be addressed. */
 function initFlashToasts() {
+    if (!flashRegion) return;
+
     document.querySelectorAll('.flash--success').forEach((flash) => {
         const text = flash.querySelector('p')?.textContent?.trim() || flash.textContent.trim();
         if (!text) return;
@@ -973,6 +1026,13 @@ function initLoadingButtons() {
         const form = e.target;
         if (!(form instanceof HTMLFormElement)) return;
         form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((btn) => {
+            if (btn.disabled) return;
+            if (btn.tagName === 'BUTTON' && btn.dataset.loadingLabel && !btn.dataset.loadingApplied) {
+                btn.dataset.loadingApplied = '1';
+                btn.dataset.originalLabel = btn.textContent.trim();
+                btn.textContent = btn.dataset.loadingLabel;
+                btn.classList.add('is-loading--label');
+            }
             btn.disabled = true;
             btn.classList.add('is-loading');
         });
@@ -986,78 +1046,6 @@ function initLoadingButtons() {
             trigger.classList.add('is-loading');
         }, 0);
     }, true);
-}
-
-/* ---------------- Top navigation progress bar ---------------- */
-
-function initNavProgress() {
-    let bar = document.getElementById('nav-progress');
-    if (!bar) {
-        bar = document.createElement('div');
-        bar.id = 'nav-progress';
-        bar.className = 'nav-progress';
-        bar.innerHTML = '<span class="nav-progress__bar"></span>';
-        document.body.prepend(bar);
-    }
-
-    let timer = null;
-    const indicator = bar.querySelector('.nav-progress__bar');
-    let progress = 0;
-
-    const start = () => {
-        if (indicator.classList.contains('is-active')) return;
-        bar.classList.add('is-active');
-        progress = 8;
-        indicator.style.width = `${progress}%`;
-        if (timer) window.clearInterval(timer);
-        timer = window.setInterval(() => {
-            progress = Math.min(progress + Math.random() * 14, 92);
-            indicator.style.width = `${progress}%`;
-        }, 220);
-    };
-
-    const finish = () => {
-        if (timer) window.clearInterval(timer);
-        indicator.style.width = '100%';
-        window.setTimeout(() => {
-            bar.classList.remove('is-active');
-            progress = 0;
-            indicator.style.width = '0';
-        }, 320);
-    };
-
-    window.addEventListener('load', () => {
-        if (timer) finish();
-    });
-    window.addEventListener('pageshow', (e) => {
-        if (!e.persisted) finish();
-    });
-
-    /* Any same-origin navigation attempt (internal links and form submits) gets
-     * the subtle top bar while the browser loads the next page. */
-    document.addEventListener('click', (e) => {
-        const link = e.target.closest('a');
-        if (!link || !link.href) return;
-        if (link.target === '_blank' || link.download) return;
-        if (link.hash && link.origin === window.location.origin) return;
-
-        let url;
-        try {
-            url = new URL(link.href);
-        } catch {
-            return;
-        }
-        if (url.origin !== window.location.origin) return;
-        if (url.pathname === window.location.pathname && url.search === window.location.search) return;
-
-        const uploading = document.querySelector('.upload-item:not(.is-done, .is-failed)');
-        if (!uploading) start();
-    }, true);
-
-    document.addEventListener('submit', (e) => {
-        if (e.defaultPrevented) return;
-        start();
-    });
 }
 
 /* ---------------- Storage warning dismissal ---------------- */
@@ -1135,15 +1123,326 @@ function initDownloadSelected() {
     });
 }
 
+function initPasswordRules() {
+  document.querySelectorAll('[data-password-form]').forEach((form) => {
+    const pwd = form.querySelector('input[name="password"]');
+    const conf = form.querySelector('input[name="password_confirmation"]');
+    const rules = form.querySelectorAll('.password-rule');
+    const submit = form.querySelector('[data-password-submit]');
+    const matchEl = form.querySelector('[data-password-match]');
+    const reason = form.querySelector('[data-submit-reason]');
+    if (!pwd) return;
+    // Only manage the submit button when the rule/match UI is actually rendered.
+    if (!rules.length && !matchEl) return;
+
+    const check = () => {
+      const v = pwd.value;
+      const hasMin = v.length >= 8;
+      const hasUpper = /[A-Z]/.test(v);
+      const hasLower = /[a-z]/.test(v);
+      const hasNum = /[0-9]/.test(v);
+      const hasSym = /[^A-Za-z0-9]/.test(v);
+      rules.forEach((r) => {
+        const type = r.dataset.rule;
+        let ok = false;
+        if (type === 'min') ok = hasMin;
+        if (type === 'upper') ok = hasUpper;
+        if (type === 'lower') ok = hasLower;
+        if (type === 'num') ok = hasNum;
+        if (type === 'sym') ok = hasSym;
+        r.classList.toggle('password-rule--valid', ok);
+        r.classList.toggle('password-rule--invalid', !ok);
+        const icon = r.querySelector('.rule-icon');
+        if (icon) icon.textContent = ok ? '\u2713' : '\u2715';
+      });
+      const allOk = hasMin && hasUpper && hasLower && hasNum && hasSym;
+      let matchOk = true;
+      if (conf) matchOk = conf.value !== '' && conf.value === v;
+      if (matchEl) {
+        matchEl.textContent = matchOk ? 'Passwords match' : 'Passwords do not match';
+        const touched = conf ? conf.value !== '' : false;
+        matchEl.classList.toggle('field__match--ok', touched && matchOk);
+        matchEl.classList.toggle('field__match--bad', touched && !matchOk);
+      }
+      if (submit) {
+        submit.disabled = !(allOk && matchOk);
+        if (reason) {
+          reason.textContent = submit.disabled
+            ? 'All password rules and the password match are required.'
+            : '';
+        }
+      }
+    };
+
+    pwd.addEventListener('input', check);
+    if (conf) conf.addEventListener('input', check);
+    check();
+  });
+}
+
+/* ---------------- Welcome landing screen ---------------- */
+
+/* ---------------- Theme (light / dark) ---------------- */
+
+/* A single stored preference drives every page. The inline script in each
+ * layout applies the resolved theme before first paint; this module wires up
+ * the toggle buttons, keeps tabs in sync and follows the OS setting until the
+ * user makes an explicit choice. */
+const THEME_KEY = 'pbo-theme';
+
+function readStoredTheme() {
+    try {
+        const value = localStorage.getItem(THEME_KEY);
+        return value === 'light' || value === 'dark' ? value : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function preferredTheme() {
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light';
+}
+
+function currentTheme() {
+    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+}
+
+function applyTheme(theme) {
+    const root = document.documentElement;
+    root.setAttribute('data-theme', theme);
+    root.style.colorScheme = theme;
+    const isDark = theme === 'dark';
+
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+        button.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+        button.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+    });
+
+    document.querySelectorAll('[data-theme-text]').forEach((el) => {
+        el.textContent = isDark ? 'Dark mode' : 'Light mode';
+    });
+}
+
+function initTheme() {
+    if (document.documentElement.hasAttribute('data-theme')) {
+        applyTheme(currentTheme());
+    } else {
+        applyTheme(readStoredTheme() || preferredTheme());
+    }
+
+    document.querySelectorAll('[data-theme-toggle]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const next = currentTheme() === 'dark' ? 'light' : 'dark';
+            applyTheme(next);
+            try {
+                localStorage.setItem(THEME_KEY, next);
+            } catch (e) {}
+        });
+    });
+
+    // Keep every open tab in sync.
+    window.addEventListener('storage', (event) => {
+        if (event.key !== THEME_KEY) return;
+        applyTheme(event.newValue === 'dark' ? 'dark' : 'light');
+    });
+
+    // Follow the OS only while the user has not chosen explicitly.
+    if (window.matchMedia) {
+        const media = window.matchMedia('(prefers-color-scheme: dark)');
+        const onChange = (event) => {
+            if (readStoredTheme() === null) applyTheme(event.matches ? 'dark' : 'light');
+        };
+        if (media.addEventListener) media.addEventListener('change', onChange);
+        else if (media.addListener) media.addListener(onChange);
+    }
+}
+
+/* The landing screen and the sign-in container are siblings in the welcome
+ * layout. "Get Started" reveals the sign-in panel (the anchor keeps linking to
+ * /login as the no-JavaScript fallback); Escape brings the landing back. */
+function initLandingScreen() {
+    const screen = document.getElementById('landing-screen');
+    const auth = document.getElementById('auth-container');
+    const cta = document.getElementById('landing-get-started');
+    if (!screen || !auth) return;
+
+    const fadeMs = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 240;
+    let lastFocused = null;
+
+    const showAuth = () => {
+        if (!auth.hidden) return;
+        lastFocused = document.activeElement;
+        auth.hidden = false;
+        auth.classList.remove('welcome-auth--visible');
+        void auth.offsetWidth;
+        auth.classList.add('welcome-auth--visible');
+        screen.classList.add('landing-screen--is-hidden');
+        window.setTimeout(() => {
+            screen.hidden = true;
+            const card = auth.querySelector('[data-auth-card]');
+            const pane = card?.querySelector('.auth-card__pane:not([inert])');
+            const target = pane?.querySelector('input:not([type="hidden"]):not([disabled])')
+                ?? pane?.querySelector('button, a[href], [tabindex]:not([tabindex="-1"])');
+            if (target) target.focus({ preventScroll: true });
+            else document.getElementById('identifier')?.focus();
+        }, fadeMs);
+    };
+
+    const showLanding = () => {
+        if (auth.hidden) return;
+        screen.hidden = false;
+        screen.classList.remove('landing-screen--is-hidden');
+        auth.classList.remove('welcome-auth--visible');
+        window.setTimeout(() => { auth.hidden = true; }, fadeMs);
+        const focusTarget = lastFocused && typeof lastFocused.focus === 'function' ? lastFocused : cta;
+        if (focusTarget) focusTarget.focus();
+    };
+
+    if (cta) {
+        cta.addEventListener('click', (e) => {
+            e.preventDefault();
+            showAuth();
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !auth.hidden) {
+            e.preventDefault();
+            showLanding();
+        }
+    });
+}
+
+/* ---------------- Auth card (sign in / create account) ---------------- */
+
+/* One card holds both forms. Switching pans the coloured overlay across and
+ * cross-fades the panes without a reload; the URL is kept in step with
+ * history.pushState so Back/Forward return to the previous pane. Without
+ * JavaScript the switch controls are plain links and both panes are rendered,
+ * toggled by the server-set data-state. */
+function initAuthCard() {
+    const card = document.querySelector('[data-auth-card]');
+    if (!card) return;
+
+    const panes = {
+        login: card.querySelector('[data-auth-pane="login"]'),
+        register: card.querySelector('[data-auth-pane="register"]'),
+    };
+    const switches = card.querySelectorAll('[data-auth-switch]');
+    const live = document.getElementById('auth-live-region');
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+    const routes = {
+        login: card.dataset.loginUrl || '/login',
+        register: card.dataset.registerUrl || '/register',
+    };
+    const labels = {
+        login: 'Sign in form shown',
+        register: 'Create account form shown',
+    };
+
+    const currentState = () => (card.dataset.state === 'register' ? 'register' : 'login');
+
+    const playStagger = (pane) => {
+        const inner = pane?.querySelector('[data-auth-stagger]');
+        if (!inner || reduce.matches) return;
+        inner.classList.remove('is-staggered');
+        void inner.offsetWidth;
+        inner.classList.add('is-staggered');
+    };
+
+    const focusFirst = (pane) => {
+        if (!pane) return;
+        const target = pane.querySelector(
+            'input:not([type="hidden"]):not([disabled]), button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
+        );
+        if (target) target.focus({ preventScroll: true });
+    };
+
+    const sync = (next, { push = true, focus = true, announce = true } = {}) => {
+        if (next !== 'login' && next !== 'register') return;
+        const changed = currentState() !== next;
+        card.dataset.state = next;
+
+        Object.entries(panes).forEach(([name, pane]) => {
+            if (!pane) return;
+            if (name === next) pane.removeAttribute('inert');
+            else pane.setAttribute('inert', '');
+        });
+
+        // Keep the off-screen overlay panel out of the a11y tree while the
+        // visible one (which carries the switch control) stays announced.
+        card.querySelectorAll('[data-auth-overlay-panel]').forEach((panel) => {
+            if (panel.dataset.authOverlayPanel === next) panel.removeAttribute('aria-hidden');
+            else panel.setAttribute('aria-hidden', 'true');
+        });
+
+        if (push && changed && window.history?.pushState) {
+            try {
+                window.history.pushState({ authState: next }, '', routes[next]);
+            } catch (e) {
+                /* history is unavailable (e.g. sandboxed file preview) */
+            }
+        }
+
+        if (announce && live) live.textContent = labels[next];
+
+        window.setTimeout(() => {
+            playStagger(panes[next]);
+            if (focus) focusFirst(panes[next]);
+        }, reduce.matches ? 0 : 320);
+    };
+
+    switches.forEach((link) => {
+        link.addEventListener('click', (e) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+            const next = link.dataset.authSwitch;
+            if (next !== 'login' && next !== 'register') return;
+            e.preventDefault();
+            sync(next, { push: true });
+        });
+    });
+
+    window.addEventListener('popstate', (e) => {
+        const next = e.state?.authState
+            || (/\/register\/?$/.test(window.location.pathname) ? 'register' : 'login');
+        sync(next, { push: false });
+    });
+
+    // Enter animation for whichever pane is on screen first.
+    playStagger(panes[currentState()]);
+
+    // On the standalone guest pages the card is visible straight away, so move
+    // focus to the first field. On the welcome page it stays hidden until the
+    // landing screen reveals it (handled by initLandingScreen).
+    if (card.offsetParent !== null && !reduce.matches) {
+        const active = document.activeElement;
+        if (!active || active === document.body) focusFirst(panes[currentState()]);
+    }
+
+    // Replay the stagger whenever the welcome reveal shows the card.
+    const container = document.getElementById('auth-container');
+    if (container && typeof MutationObserver === 'function') {
+        new MutationObserver(() => {
+            if (!container.hidden) playStagger(panes[currentState()]);
+        }).observe(container, { attributes: true, attributeFilter: ['hidden'] });
+    }
+}
+
+/* ---------------- Bootstrap ---------------- */
+
 document.addEventListener('DOMContentLoaded', () => {
-    initSidebar();
+    initTheme();
     initUploads();
-    initDeletes();
     initBulkSelect();
     initDialogs();
     initZoom();
     initFilters();
     initPasswordToggles();
+    initSidebar();
+    initUserMenu();
     initAvatar();
     initNameEditor();
     initRegisterAgreement();
@@ -1151,7 +1450,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initEmptyStates();
     initImageSkeletons();
     initLoadingButtons();
-    initNavProgress();
     initStorageWarning();
     initDownloadSelected();
+    initPasswordRules();
+    initLandingScreen();
+    initAuthCard();
 });

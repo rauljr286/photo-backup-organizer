@@ -4,7 +4,6 @@
         <p class="legal__updated">Last updated: {{ date('F j, Y') }}</p>
 
         @include('legal.partials.privacy-content', [
-            'retentionDays' => $retentionDays,
             'supportEmail' => $supportEmail,
         ])
     </article>

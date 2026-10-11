@@ -1,14 +1,28 @@
 <x-app-layout :title="'Albums'">
     <div class="albums">
-        <div class="dashboard__top">
-            <div>
-                <h1 class="page-title">Albums</h1>
-                <p class="page-subtitle">Group related photos into albums you can browse and download.</p>
+        <div class="section-head">
+            <span class="section-head__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                </svg>
+            </span>
+            <div class="section-head__text">
+                <h1 class="section-head__title">Albums</h1>
+                <p class="section-head__subtitle">Group related photos into albums you can browse and download.</p>
             </div>
         </div>
 
         <section class="panel" aria-labelledby="new-album-heading">
-            <h2 class="panel__heading" id="new-album-heading">Create a new album</h2>
+            <h2 class="panel__heading panel__heading--icon" id="new-album-heading">
+                <span class="heading-icon heading-icon--primary" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                        <line x1="12" y1="11" x2="12" y2="17"></line>
+                        <line x1="9" y1="14" x2="15" y2="14"></line>
+                    </svg>
+                </span>
+                Create a new album
+            </h2>
             <form method="POST" action="{{ route('albums.store') }}" class="form form--row">
                 @csrf
                 <div class="field field--grow">
@@ -37,6 +51,11 @@
                 @foreach ($albums as $album)
                     <article class="album-card">
                         <a class="album-card__link" href="{{ route('albums.show', $album) }}">
+                            <span class="album-card__icon" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                            </span>
                             <h2 class="album-card__name">{{ $album->name }}</h2>
                             <p class="album-card__count">
                                 {{ $album->photos_count }} photo(s)

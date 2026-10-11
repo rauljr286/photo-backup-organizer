@@ -13,7 +13,7 @@ use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\URL;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'storage_limit_mb', 'avatar_path', 'agreed_to_terms_at'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'storage_limit_mb', 'avatar_path', 'agreed_to_terms_at', 'provider', 'provider_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -59,6 +59,47 @@ class User extends Authenticatable
         }
 
         return URL::asset('storage/'.$this->avatar_path);
+    }
+
+    /**
+     * Up to two uppercase initials derived from the user's name.
+     *
+     * Uses the first letter of the name and the first letter of the surname,
+     * skipping middle initials (a lone letter such as "M.") and name
+     * extensions (Jr., Sr., II, III, IV, V). "Raul M. Colot Jr" -> "RC".
+     */
+    public function initials(): string
+    {
+        $parts = preg_split('/\s+/', trim((string) $this->name), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+        if ($parts === []) {
+            return '';
+        }
+
+        $suffixes = ['jr', 'jr.', 'sr', 'sr.', 'ii', 'iii', 'iv', 'v'];
+        $withoutSuffixes = array_values(array_filter(
+            $parts,
+            fn (string $part) => ! in_array(mb_strtolower($part), $suffixes, true),
+        ));
+
+        $withoutInitials = array_values(array_filter(
+            $withoutSuffixes,
+            fn (string $part) => ! preg_match('/^[\p{L}]\.?$/u', $part),
+        ));
+
+        $significant = $withoutInitials !== [] ? $withoutInitials : $withoutSuffixes;
+
+        if ($significant === []) {
+            $significant = $parts;
+        }
+
+        $initials = mb_substr($significant[0], 0, 1);
+
+        if (count($significant) > 1) {
+            $initials .= mb_substr($significant[count($significant) - 1], 0, 1);
+        }
+
+        return mb_strtoupper($initials);
     }
 
     /**

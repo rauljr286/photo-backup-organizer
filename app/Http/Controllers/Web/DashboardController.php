@@ -55,23 +55,22 @@ class DashboardController extends Controller
             'usedBytes' => $user->storageUsedBytes(),
             'limitBytes' => $user->storageLimitBytes(),
             'usedPercent' => $user->storageUsedPercent(),
-            'trashedCount' => $user->photos()->onlyTrashed()->count(),
+            'archivedCount' => $user->photos()->archived()->count(),
             'unbackedUpCount' => $user->photos()->whereNull('remote_path')->count(),
             'request' => $request,
         ]);
     }
 
     /**
-     * All photos currently sitting in the trash.
+     * All photos currently sitting in the archive.
      */
-    public function trash(Request $request): View
+    public function archive(Request $request): View
     {
         $user = $request->user();
 
-        return view('photos.trash', [
+        return view('photos.archive', [
             'user' => $user,
-            'photos' => $user->photos()->onlyTrashed()->orderByDesc('deleted_at')->paginate(24),
-            'retentionDays' => (int) config('photobackup.trash_retention_days', 30),
+            'photos' => $user->photos()->archived()->orderByDesc('archived_at')->paginate(24),
         ]);
     }
 
@@ -128,7 +127,6 @@ class DashboardController extends Controller
         return view('settings', [
             'user' => $user,
             'activeTab' => $request->query('tab', 'profile'),
-            'retentionDays' => (int) config('photobackup.trash_retention_days', 30),
             'supportEmail' => config('photobackup.support_email', 'support@example.com'),
             'photoCount' => $user->photos()->count(),
             'albumCount' => $user->albums()->count(),

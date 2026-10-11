@@ -25,8 +25,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/photos', [PhotoController::class, 'index']);
     Route::post('/photos', [PhotoController::class, 'store']);
     Route::get('/photos/{photo}', [PhotoController::class, 'show']);
-    Route::delete('/photos/{photo}', [PhotoController::class, 'destroy']);
-    Route::post('/photos/{photo}/restore', [PhotoController::class, 'restore']);
+    Route::delete('/photos/{photo}', [PhotoController::class, 'archive']);
+    Route::post('/photos/{photo}/unarchive', [PhotoController::class, 'unarchive']);
     // Web-only convenience route so the browser can display the binary:
     Route::get('/photos/{photo}/raw', [PhotoController::class, 'raw'])->middleware('auth:sanctum');
 

@@ -2,25 +2,38 @@
 
 namespace App\Http\Controllers\Web;
 
+use App\HasPhoneNormalization;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\RegisterRequest;
-use App\Mail\PasswordResetLink;
 use App\Models\User;
-use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Auth\Events\Failed;
+use Illuminate\Auth\Events\Lockout;
 use Illuminate\Cache\RateLimiter;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Exceptions\MethodNotAllowedException;
+use Illuminate\Routing\Exceptions\NotFoundHttpException;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    /**
+     * Routes that answer with a file instead of a page. Reaching one of them
+     * is almost always the tail of a sub-resource request, so it is never a
+     * sensible place to drop a user who has just signed in.
+     */
+    private const FILE_ROUTES = [
+        'photos.thumbnail',
+        'photos.raw',
+        'photos.download',
+        'albums.download',
+    ];
+
     /**
      * Show the login form.
      */
@@ -42,25 +55,85 @@ class AuthController extends Controller
         $key = $this->throttleKey($request, 'login');
 
         if ($limiter->tooManyAttempts($key, 5)) {
+            event(new Lockout($request));
+
             throw ValidationException::withMessages([
-                'email' => 'Too many login attempts. Please try again in '.$limiter->availableIn($key).' seconds.',
+                'identifier' => 'Too many login attempts. Please try again in '.$limiter->availableIn($key).' seconds.',
             ]);
         }
 
-        $credentials = $request->only('email', 'password');
+        $identifier = (string) $request->input('identifier');
+        $password = (string) $request->input('password');
+        $remember = (bool) $request->boolean('remember');
 
-        if (! Auth::attempt($credentials, (bool) $request->boolean('remember'))) {
+        $user = null;
+        if (filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
+            $user = User::where('email', Str::lower($identifier))->first();
+        } else {
+            $normalizedPhone = HasPhoneNormalization::normalizePhone($identifier);
+            $user = User::where('phone', $normalizedPhone)->first();
+            if (! $user && $identifier !== $normalizedPhone) {
+                $user = User::where('phone', $identifier)->first();
+            }
+        }
+
+        if (! $user || ! Hash::check($password, $user->password)) {
             $limiter->hit($key, 60);
 
+            event(new Failed('web', $user, []));
+
             throw ValidationException::withMessages([
-                'email' => 'The email address or password you entered is incorrect.',
+                'identifier' => 'The email address or mobile number and password you entered is incorrect.',
             ]);
         }
 
+        Auth::login($user, $remember);
         $limiter->clear($key);
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->to($this->intendedUrl($request));
+    }
+
+    /**
+     * Where a freshly signed-in user should land.
+     *
+     * The `auth` middleware remembers the page a guest asked for, which is how
+     * someone who clicked "Albums" ends up back on /albums after signing in.
+     * The thumbnail, raw and download routes sit behind that same middleware,
+     * so a browser loading an image while signed out can leave a bare file in
+     * there — landing on it straight after signing in is never useful, so those
+     * fall back to the dashboard. Anything that is not a real page in this app
+     * falls back too, which also keeps the redirect on this host.
+     */
+    private function intendedUrl(Request $request): string
+    {
+        $dashboard = route('dashboard');
+        $intended = $request->session()->pull('url.intended');
+
+        if (! is_string($intended) || trim($intended) === '') {
+            return $dashboard;
+        }
+
+        $target = parse_url($intended);
+
+        if ($target === false || (isset($target['host']) && $target['host'] !== $request->getHost())) {
+            return $dashboard;
+        }
+
+        $path = '/'.ltrim($target['path'] ?? '/', '/');
+        $destination = $path.((isset($target['query']) && $target['query'] !== '') ? '?'.$target['query'] : '');
+
+        try {
+            $route = app('router')->getRoutes()->match(Request::create($destination, 'GET'));
+        } catch (MethodNotAllowedException|NotFoundHttpException $exception) {
+            return $dashboard;
+        }
+
+        if (in_array($route->getName(), self::FILE_ROUTES, true)) {
+            return $dashboard;
+        }
+
+        return $destination;
     }
 
     /**
@@ -72,7 +145,6 @@ class AuthController extends Controller
     {
         return view('auth.register', [
             'agreed' => $request->session()->has('agreed_to_terms_at'),
-            'retentionDays' => (int) config('photobackup.trash_retention_days', 30),
             'supportEmail' => config('photobackup.support_email', 'support@example.com'),
         ]);
     }
@@ -101,10 +173,14 @@ class AuthController extends Controller
             ]);
         }
 
+        $email = $request->input('email');
+        $phone = $request->input('phone');
+
         $user = User::create([
             'name' => $request->name,
-            'email' => $request->email,
-            'password' => $request->password,
+            'email' => $email ? Str::lower($email) : null,
+            'phone' => HasPhoneNormalization::normalizePhone($phone),
+            'password' => Hash::make((string) $request->input('password')),
             'agreed_to_terms_at' => $request->session()->get('agreed_to_terms_at'),
         ]);
 
@@ -119,6 +195,8 @@ class AuthController extends Controller
      */
     public function logout(Request $request): RedirectResponse
     {
+        // Logging handled by the Logout event listener.
+
         Auth::logout();
 
         $request->session()->invalidate();
@@ -128,118 +206,35 @@ class AuthController extends Controller
     }
 
     /**
-     * Show the "forgot password" form.
-     */
-    public function showForgotPassword(): View
-    {
-        return view('auth.forgot-password');
-    }
-
-    /**
-     * Send a password reset link.
-     *
-     * Requests are rate-limited per email+IP so this endpoint cannot be abused
-     * to spam the reset mailer. The count is intentionally not cleared on
-     * success: the short cooldown simply protects the form from automated abuse.
-     */
-    public function sendResetLink(Request $request): RedirectResponse
-    {
-        $limiter = app(RateLimiter::class);
-        $key = $this->throttleKey($request, 'forgot-password');
-
-        if ($limiter->tooManyAttempts($key, 5)) {
-            throw ValidationException::withMessages([
-                'email' => 'Too many reset requests. Please try again in '.$limiter->availableIn($key).' seconds.',
-            ]);
-        }
-
-        $request->validate(['email' => ['required', 'email']], [
-            'email.required' => 'Please enter your email address.',
-            'email.email' => 'Please enter a valid email address.',
-        ]);
-
-        $user = User::where('email', $request->email)->first();
-
-        if ($user === null) {
-            $limiter->hit($key, 60);
-
-            return back()->with('status', 'If an account exists for that email, a reset link has been sent.');
-        }
-
-        $token = Password::broker()->createToken($user);
-
-        $limiter->hit($key, 60);
-
-        Mail::to($user)->send(new PasswordResetLink($user, $token));
-
-        if (app()->environment('local')) {
-            // Development convenience: mail is logged by default, so also surface the link.
-            $link = route('password.reset', ['token' => $token, 'email' => $user->email]);
-
-            return back()->with('status', 'Development mode: a reset link was generated — '.$link);
-        }
-
-        return back()->with('status', 'If an account exists for that email, a reset link has been sent.');
-    }
-
-    /**
-     * Cache key (scope + email + IP) used for throttling login and password
-     * reset requests.
+     * Cache key (scope + email + IP) used for throttling login requests.
      */
     protected function throttleKey(Request $request, string $scope): string
     {
-        $email = Str::lower((string) $request->string('email'));
+        $identifier = (string) $request->input('identifier', $request->input('email', ''));
+        $identifier = Str::lower($identifier);
 
-        return 'auth-'.$scope.':'.$email.'|'.$request->ip();
+        return 'auth-'.$scope.':'.$identifier.'|'.$request->ip();
     }
 
-    /**
-     * Show the password reset form.
-     */
-    public function showResetForm(Request $request, string $token): View
+    private function sanitizeIdentifierForLog(?string $identifier): ?string
     {
-        return view('auth.reset-password', [
-            'token' => $token,
-            'email' => $request->email,
-        ]);
-    }
-
-    /**
-     * Reset the user's password.
-     */
-    public function resetPassword(Request $request): RedirectResponse
-    {
-        $request->validate([
-            'token' => ['required'],
-            'email' => ['required', 'email'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
-        ], [
-            'email.required' => 'Please enter your email address.',
-            'email.email' => 'Please enter a valid email address.',
-            'password.required' => 'Please choose a new password.',
-            'password.min' => 'Your password must be at least 8 characters long.',
-            'password.confirmed' => 'The password confirmation does not match.',
-        ]);
-
-        $status = Password::broker()->reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function (User $user, string $password) {
-                $user->password = Hash::make($password);
-                $user->save();
-
-                event(new PasswordReset($user));
-                Auth::login($user);
-            }
-        );
-
-        if ($status === Password::PASSWORD_RESET) {
-            $request->session()->regenerate();
-
-            return redirect()->route('dashboard')->with('status', 'Your password has been reset and you are signed in.');
+        if (! $identifier) {
+            return null;
+        }
+        $identifier = trim($identifier);
+        if ($identifier === '') {
+            return null;
+        }
+        if (filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
+            return Str::lower($identifier);
+        }
+        if (preg_match('/^09\d{9}$/', $identifier)) {
+            return $identifier;
+        }
+        if (preg_match('/^\+639\d{9}$/', $identifier)) {
+            return $identifier;
         }
 
-        throw ValidationException::withMessages([
-            'email' => __($status),
-        ]);
+        return null;
     }
 }

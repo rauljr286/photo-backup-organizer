@@ -11,8 +11,8 @@
             <li>You may delete your account and all associated photos at any time from
                 <a class="link" href="{{ route('settings', ['tab' => 'privacy']) }}">Settings</a>.</li>
             <li>
-                We retain deleted items for <strong>{{ $retentionDays }} days</strong> in a recovery trash
-                before permanent removal.
+                Archived photos are kept until you choose to restore them. There is no automatic
+                deletion of your photos.
             </li>
             <li>Contact <a class="link" href="mailto:{{ $supportEmail }}">{{ $supportEmail }}</a> for
                 privacy-related questions or data deletion requests.</li>
@@ -31,6 +31,13 @@
             Photos are stored in a private storage area owned by your account. Files are transferred over
             encrypted connections (TLS) and kept encrypted at rest. Access is authenticated and isolated so
             that one user can never read another user&rsquo;s photos.
+        </p>
+
+        <h2>Sign-in activity</h2>
+        <p>
+            For security purposes, we record sign-in, sign-out, and failed sign-in attempts with the time,
+            IP address, browser/device, and the email or mobile number used. This information is not shown
+            to other users, is not shared, and may be deleted periodically.
         </p>
 
         <h2>Your rights</h2>

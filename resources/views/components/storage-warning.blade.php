@@ -9,7 +9,7 @@
     $usedPercent = $user->storageUsedPercent();
     $usedMb = number_format($user->storageUsedBytes() / 1024 / 1024, 1);
     $limitMb = number_format($user->storageLimitBytes() / 1024 / 1024, 0);
-    $trashed = $user->photos()->onlyTrashed()->count();
+    $archived = $user->photos()->archived()->count();
 @endphp
 
 {{-- Warn once the user crosses 80% of their quota. Dismissal is remembered in
@@ -26,10 +26,10 @@
             <p class="storage-warning__title">Storage nearly full — {{ $usedPercent }}% used</p>
             <p class="storage-warning__text">
                 You have used {{ $usedMb }} of {{ $limitMb }} MB.
-                @if ($trashed > 0)
-                    Some space is pending cleanup: {{ $trashed }} photo(s) sit in your trash.
+                @if ($archived > 0)
+                    {{ $archived }} photo(s) are archived and still count toward your storage.
                 @endif
-                Consider emptying the trash or removing unused photos to free up space.
+                Restore or remove unused photos to free up space.
             </p>
         </div>
         <button type="button" class="storage-warning__close" data-storage-warning-dismiss aria-label="Dismiss storage warning">&times;</button>

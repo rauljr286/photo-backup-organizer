@@ -3,11 +3,17 @@
 use App\Http\Controllers\Web\AlbumController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\InsightsController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\PhotoController;
+use App\Http\Controllers\Web\SocialAuthController;
 use Illuminate\Support\Facades\Route;
 
-Route::redirect('/', '/login');
+Route::get('/', function () {
+    return view('welcome', [
+        'supportEmail' => config('photobackup.support_email', 'support@example.com'),
+    ]);
+})->name('home');
 
 Route::get('/privacy', [LegalController::class, 'privacy'])->name('privacy');
 Route::get('/terms', [LegalController::class, 'terms'])->name('terms');
@@ -20,10 +26,8 @@ Route::middleware('guest')->group(function () {
     Route::post('/register/agree', [AuthController::class, 'agreeToTerms'])->name('register.agree');
     Route::post('/register', [AuthController::class, 'register'])->name('register.store');
 
-    Route::get('/forgot-password', [AuthController::class, 'showForgotPassword'])->name('password.request');
-    Route::post('/forgot-password', [AuthController::class, 'sendResetLink'])->name('password.email');
-    Route::get('/reset-password/{token}', [AuthController::class, 'showResetForm'])->name('password.reset');
-    Route::post('/reset-password', [AuthController::class, 'resetPassword'])->name('password.update');
+    Route::get('/auth/{provider}/redirect', [SocialAuthController::class, 'redirect'])->name('social.redirect');
+    Route::get('/auth/{provider}/callback', [SocialAuthController::class, 'callback'])->name('social.callback');
 });
 
 Route::middleware('auth')->group(function () {
@@ -32,7 +36,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/photos', [DashboardController::class, 'upload'])->name('photos.store');
     Route::post('/backup', [DashboardController::class, 'backupNow'])->name('backup.now');
-    Route::get('/trash', [DashboardController::class, 'trash'])->name('trash');
+    Route::get('/archive', [DashboardController::class, 'archive'])->name('archive');
+
+    Route::get('/insights', [InsightsController::class, 'show'])->name('insights');
+    Route::get('/cleanup', [InsightsController::class, 'cleanup'])->name('cleanup');
 
     Route::get('/settings', [DashboardController::class, 'settings'])->name('settings');
     Route::patch('/settings/name', [DashboardController::class, 'updateName'])->name('settings.name');
@@ -49,13 +56,14 @@ Route::middleware('auth')->group(function () {
     Route::delete('/albums/{album}/photos', [AlbumController::class, 'removePhoto'])->name('albums.photos.remove');
     Route::get('/albums/{album}/download', [AlbumController::class, 'download'])->name('albums.download');
 
-    Route::get('/photos/{photo}', [PhotoController::class, 'show'])->withTrashed()->name('photos.show');
-    Route::get('/photos/{photo}/raw', [PhotoController::class, 'raw'])->withTrashed()->name('photos.raw');
-    Route::get('/photos/{photo}/thumbnail', [PhotoController::class, 'thumbnail'])->withTrashed()->name('photos.thumbnail');
-    Route::get('/photos/{photo}/download', [PhotoController::class, 'download'])->withTrashed()->name('photos.download');
+    Route::get('/photos/{photo}', [PhotoController::class, 'show'])->name('photos.show');
+    Route::get('/photos/{photo}/raw', [PhotoController::class, 'raw'])->name('photos.raw');
+    Route::get('/photos/{photo}/thumbnail', [PhotoController::class, 'thumbnail'])->name('photos.thumbnail');
+    Route::get('/photos/{photo}/download', [PhotoController::class, 'download'])->name('photos.download');
+    Route::post('/photos/bulk-update', [PhotoController::class, 'updateBulkMeta'])->name('photos.bulk-update');
     Route::post('/photos/download-selected', [PhotoController::class, 'downloadSelected'])->name('photos.download-selected');
-    Route::patch('/photos/{photo}', [PhotoController::class, 'updateDiskMeta'])->withTrashed()->name('photos.update');
-    Route::delete('/photos/{photo}', [PhotoController::class, 'trash'])->withTrashed()->name('photos.trash');
-    Route::post('/photos/{photo}/restore', [PhotoController::class, 'restore'])->withTrashed()->name('photos.restore');
-    Route::delete('/photos/{photo}/purge', [PhotoController::class, 'purge'])->withTrashed()->name('photos.purge');
+    Route::patch('/photos/{photo}', [PhotoController::class, 'updateDiskMeta'])->name('photos.update');
+    Route::post('/photos/{photo}/rotate', [PhotoController::class, 'rotate'])->name('photos.rotate');
+    Route::delete('/photos/{photo}', [PhotoController::class, 'archive'])->name('photos.archive');
+    Route::post('/photos/{photo}/unarchive', [PhotoController::class, 'unarchive'])->name('photos.unarchive');
 });
