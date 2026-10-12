@@ -6,7 +6,6 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\URL;
 use Tests\TestCase;
 
 class AvatarTest extends TestCase
@@ -109,6 +108,6 @@ class AvatarTest extends TestCase
         $response = $this->actingAs($this->user, 'sanctum')->getJson('/api/user');
 
         $response->assertOk()
-            ->assertJsonPath('user.avatar_url', URL::asset('storage/'.$this->user->avatar_path));
+            ->assertJsonPath('user.avatar_url', route('avatar', ['user' => $this->user->id], absolute: true));
     }
 }

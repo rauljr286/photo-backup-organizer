@@ -2,18 +2,16 @@
 
 use App\Http\Controllers\Web\AlbumController;
 use App\Http\Controllers\Web\AuthController;
+use App\Http\Controllers\Web\AvatarController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\InsightsController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\PhotoController;
 use App\Http\Controllers\Web\SocialAuthController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome', [
-        'supportEmail' => config('photobackup.support_email', 'support@example.com'),
-    ]);
-})->name('home');
+Route::get('/', HomeController::class)->name('home');
 
 Route::get('/privacy', [LegalController::class, 'privacy'])->name('privacy');
 Route::get('/terms', [LegalController::class, 'terms'])->name('terms');
@@ -46,6 +44,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/settings/avatar', [DashboardController::class, 'updateAvatar'])->name('settings.avatar');
     Route::patch('/settings/password', [DashboardController::class, 'changePassword'])->name('settings.password');
     Route::delete('/settings/account', [DashboardController::class, 'deleteAccount'])->name('settings.delete-account');
+
+    Route::get('/avatar/{user}', [AvatarController::class, 'show'])->name('avatar');
 
     Route::get('/albums', [AlbumController::class, 'index'])->name('albums.index');
     Route::post('/albums', [AlbumController::class, 'store'])->name('albums.store');

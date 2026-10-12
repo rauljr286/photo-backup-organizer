@@ -10,7 +10,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Support\Facades\URL;
 use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable(['name', 'email', 'phone', 'password', 'storage_limit_mb', 'avatar_path', 'agreed_to_terms_at', 'provider', 'provider_id'])]
@@ -49,8 +48,9 @@ class User extends Authenticatable
      * Public URL for the profile picture, or null when the user has not
      * uploaded one (the UI falls back to a generic placeholder icon).
      *
-     * The URL is resolved against the current request host so it stays valid
-     * regardless of APP_URL (mirrors how Photo::url() builds photo URLs).
+     * The image is streamed by the app through a controller route backed by
+     * the Storage facade, so it does not depend on the public/storage symlink
+     * that a shared hosting / buildpack setup may not create.
      */
     public function avatarUrl(): ?string
     {
@@ -58,7 +58,7 @@ class User extends Authenticatable
             return null;
         }
 
-        return URL::asset('storage/'.$this->avatar_path);
+        return route('avatar', ['user' => $this->id], absolute: true);
     }
 
     /**

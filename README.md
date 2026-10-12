@@ -120,8 +120,8 @@ then in Render use **New → Blueprint** and select the repository — the
 blueprint provisions the database, builds the Dockerfile, and deploys.
 
 1. **Create a repository** on [GitHub](https://github.com) and push this folder
-   (Git is not required — GitHub's web upload works too). The compiled assets
-   in `public/build` must be included; `.env`, `vendor/`, `node_modules/` and
+   (Git is not required — GitHub's web upload works too). `.env`, `vendor/`,
+   `node_modules/`, `public/build` (compiled during the image build) and
    `storage/app/*` are excluded automatically.
 2. **Deploy:** Render → **New → Blueprint** → pick the repo. Wait for the build
    and the `php artisan migrate` step (part of the container startup).
@@ -142,6 +142,142 @@ Free-tier notes:
 - Uploads are stored in the container's ephemeral disk, so they are lost on a
   new deploy. For persistence set `PHOTOS_CLOUD_DISK=s3` and the matching
   `AWS_*` keys (see "Enabling real cloud backup").
+
+## Deploying to Railway
+
+The repo ships a **`Dockerfile`** (PHP 8.3 + Apache + MySQL). Railway
+builds and runs that Dockerfile, so **this route does not use Railpack**. It
+also means you do **not** set a custom build command or pre-deploy command —
+the image builds the front-end assets and the container runs the migrations
+itself (details below). Railway still serves the app behind its own proxy with
+HTTPS, and the repo is configured for that:
+
+- `bootstrap/app.php` trusts the proxy headers (`trustProxies(at: '*')`).
+- `AppServiceProvider` forces the `https` scheme in production so generated
+  URLs never become mixed content.
+- The image raises the PHP upload limits (via `uploads.ini`:
+  `upload_max_filesize=64M`, `post_max_size=128M`, `max_file_uploads=200`,
+  `memory_limit=256M`, `max_execution_time=300`) so bulk uploads do not fail
+  with HTTP 413 or "No photos were received", and `npm run build` compiles the
+  Vite assets into `public/build` during the image build.
+- On **every container start** the entrypoint (`docker/entrypoint.sh`): makes
+  Apache listen on Railway's `PORT`, re-creates and chowns the storage tree
+  (a mounted Volume comes up root-owned), runs `php artisan migrate --force`
+  and `php artisan storage:link --force`.
+- Photos, thumbnails and avatars are stored via the `public` disk
+  (`storage/app/public`) with relative paths, and are streamed back through
+  controller routes backed by the Storage facade — nothing depends on a
+  symlink surviving the build.
+- There are **no queued jobs or queued mail listeners**, so `QUEUE_CONNECTION=sync`
+  runs everything (thumbnail generation, mirror backup, login logging) inside
+  the request — no worker service is required.
+
+> The project-root `php.ini` and the `RAILPACK_PHP_EXTENSIONS` variable apply
+> **only to Railpack** and are **not used** when building the Dockerfile — the
+> upload limits above are baked into the image instead.
+
+### 1. Create the Railway project and database
+
+Push this repo to GitHub and create a new project in Railway from it. Add a
+**MySQL** service (Railway provisions a MySQL 8 service). Copy the connection
+string it shows you — that is the `DB_URL` value.
+
+### 2. Environment variables
+
+Set these in **Variables** (names and example values only — real secrets go in
+Railway's variable editor, never in the repo):
+
+| Variable                     | Example value                             | Purpose                                          |
+| ---------------------------- | ----------------------------------------- | ------------------------------------------------ |
+| `APP_NAME`                   | `Photo Backup Organizer`                  | Shown in the title bar and emails                |
+| `APP_ENV`                    | `production`                              | Production behaviour (no debug)                  |
+| `APP_DEBUG`                  | `false`                                   | Never true in production                         |
+| `APP_URL`                    | `https://<your-project>.up.railway.app`   | Public URL used to build absolute links          |
+| `APP_KEY`                    | `base64:...` (run `php artisan key:generate --show`) | Application encryption key            |
+| `DB_CONNECTION`              | `mysql`                                   | Database driver                                  |
+| `DB_URL`                     | `mysql://user:password@host:3306/railway` | Full connection string from the MySQL service    |
+| `SESSION_DRIVER`             | `database`                                | Sessions stored in MySQL (`sessions` table)      |
+| `CACHE_STORE`                | `database`                                | Cache stored in MySQL (`cache` table)            |
+| `QUEUE_CONNECTION`           | `sync`                                    | Run jobs inline — no worker needed               |
+| `LOG_CHANNEL`                | `stderr`                                  | Logs go to stdout/stderr, visible in Railway     |
+| `MAIL_MAILER`                | `log`                                     | Write mail to the log instead of sending (see below) |
+| `MAIL_FROM_ADDRESS`          | `support@example.com`                     | From address for any email the app sends         |
+| `PHOTOS_SUPPORT_EMAIL`       | `support@example.com`                     | Support address shown on the legal pages         |
+| `PHOTOS_MAX_UPLOAD_MB`       | `20`                                      | Per-photo size cap (must stay under 64M)         |
+
+Optional:
+
+| Variable                     | Purpose                                                        |
+| ---------------------------- | -------------------------------------------------------------- |
+| `PHOTOS_CLOUD_DISK`          | `s3` to mirror "Back Up Now" uploads to an S3-compatible bucket |
+| `AWS_*`                      | Credentials/bucket for the S3 disk                             |
+| `GOOGLE_CLIENT_ID/SECRET`    | Google sign-in (redirect: `{APP_URL}/auth/google/callback`)    |
+| `FACEBOOK_CLIENT_ID/SECRET`  | Facebook sign-in                                               |
+
+Notes:
+
+- **`APP_URL`** must be the exact live URL (see step 4 for the public domain).
+- **`APP_KEY`** — generate one once with `php artisan key:generate --show`
+  locally (or `php -r "echo base64_encode(random_bytes(32));"`) and paste the
+  `base64:...` value into `APP_KEY`. Do not leave it empty.
+- **`DB_URL`** is the single source of truth for the connection; `DB_HOST`,
+  `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` and `DB_PASSWORD` are **not** needed
+  on Railway.
+- **`PORT`** is injected automatically by Railway — do **not** set it by hand.
+  The container entrypoint makes Apache listen on it (falling back to `80`).
+- If you add OAuth, copy the provider's authorised redirect URI from the
+  provider console using your live `APP_URL`.
+
+### 3. No build or pre-deploy commands needed
+
+Because the repo contains a `Dockerfile`, Railway builds that image and you
+leave **Settings → Deploy** empty:
+
+- `npm run build` runs **during the image build**, so `public/build` is
+  produced inside the image (it is git-ignored and never committed).
+- `php artisan migrate --force` runs **at container start** from
+  `docker/entrypoint.sh`, together with `storage:link --force`.
+
+Setting a build command or pre-deploy command is unnecessary (and the
+Railpack-era `npm run build && php artisan storage:link --force` commands no
+longer apply).
+
+### 4. Public domain
+
+On your service's **Settings → Networking**: **Generate Domain** (a `.up.railway.app`
+URL), or add a **Custom Domain**. Put that exact URL in `APP_URL`, then redeploy.
+
+### 5. Persist uploaded photos (ephemeral filesystem)
+
+Railway's filesystem is **ephemeral** — anything written to `storage/app`
+during a deploy is lost on the next deploy. To keep users' uploads, either:
+
+- **Attach a Volume** to the service and mount it at
+  **`/var/www/html/storage/app`** (the container's working directory is
+  `/var/www/html`, so this is Laravel's `storage_path('app')`). The startup
+  script re-creates and chowns the storage tree on every boot, so the
+  root-owned volume is writable by PHP; or
+- **Use an S3-compatible bucket**: set `PHOTOS_CLOUD_DISK=s3`, fill in the
+  `AWS_*` variables, and install the Flysystem adapter
+  (`composer require league/flysystem-aws-s3-v3`).
+
+Without either, avatars, photos and thumbnails survive until the next deploy
+but are then wiped (the database keeps the metadata pointing at missing files).
+
+### 6. Reading the password reset email
+
+With `MAIL_MAILER=log`, Laravel writes every outgoing email to the default log
+channel instead of sending it. With `LOG_CHANNEL=stderr` (as above) that means
+the full message — including the password reset link — is printed to the
+service logs:
+
+1. Open the service in Railway and click **Deployments**.
+2. Select the running deployment and open the **Logs** panel (or **View Logs**).
+3. Trigger "forgot password" in the app; the reset email appears in the logs.
+
+For real delivery, switch `MAIL_MAILER` to `smtp` (plus `MAIL_HOST`,
+`MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`) or a provider mailer such as
+`resend`, `postmark` or `ses`.
 
 ## Testing
 

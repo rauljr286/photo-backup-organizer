@@ -12,6 +12,7 @@ use Illuminate\Auth\Events\Login;
 use Illuminate\Auth\Events\Logout;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use SocialiteProviders\Google\GoogleExtendSocialite;
 use SocialiteProviders\Manager\SocialiteWasCalled;
@@ -33,6 +34,15 @@ class AppServiceProvider extends ServiceProvider
     {
         Paginator::defaultView('pagination.custom');
         Paginator::defaultSimpleView('pagination.custom');
+
+        // Behind the Railway proxy the request scheme the browser used is only
+        // reachable through the trustProxies() setting in bootstrap/app.php.
+        // Once trusted, Laravel's request()->secure()/URL generation picks up
+        // https automatically, and this forces it so every generated URL uses
+        // https and the browser never blocks mixed content (unstyled pages).
+        if (app()->environment('production') || str_starts_with((string) config('app.url'), 'https')) {
+            URL::forceScheme('https');
+        }
 
         // Google is not bundled with Socialite; the socialiteproviders package
         // registers its driver through this event.
