@@ -114,9 +114,9 @@
                     <tbody>
                         @foreach ($byYear as $year => $row)
                             <tr>
-                                <td><strong>{{ $year }}</strong></td>
-                                <td class="insight-table__num">{{ number_format($row['count']) }}</td>
-                                <td class="insight-table__num">{{ $fmt($row['bytes']) }}</td>
+                                <td data-label="Year"><strong>{{ $year }}</strong></td>
+                                <td class="insight-table__num" data-label="Photos">{{ number_format($row['count']) }}</td>
+                                <td class="insight-table__num" data-label="Storage">{{ $fmt($row['bytes']) }}</td>
                             </tr>
                         @endforeach
                     </tbody>

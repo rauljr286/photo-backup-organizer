@@ -16,3 +16,15 @@
         document.documentElement.setAttribute('data-theme', theme);
     })();
 </script>
+
+{{-- PWA: install metadata. Theme colours cover both schemes; the icons and
+     manifest are static public files (no session data). --}}
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#0f766e">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1020">
+<link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Photo Backup">

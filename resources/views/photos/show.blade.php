@@ -216,5 +216,33 @@
                 </section>
             </div>
         </div>
+
+        {{-- Phone-only sticky action bar. Proxies the existing forms/buttons above --
+             no new backend actions; hidden at >=768px via CSS. --}}
+        <nav class="pd-actionbar" aria-label="Photo actions">
+            <a class="pd-actionbar__btn" href="#details">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                <span class="pd-actionbar__label">Rename</span>
+            </a>
+
+            @unless ($photo->isPrivate())
+                <button type="button" class="pd-actionbar__btn" data-pd-archive>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                    <span class="pd-actionbar__label">{{ $photo->isArchived() ? 'Unarchive' : 'Archive' }}</span>
+                </button>
+            @endunless
+
+            <a class="pd-actionbar__btn" href="{{ route('photos.download', $photo) }}">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                <span class="pd-actionbar__label">Download</span>
+            </a>
+
+            @if ($photo->isRotatable())
+                <button type="button" class="pd-actionbar__btn" data-pd-rotate>
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                    <span class="pd-actionbar__label">Rotate</span>
+                </button>
+            @endif
+        </nav>
     </div>
 </x-app-layout>

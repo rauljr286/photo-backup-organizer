@@ -6781,3 +6781,417 @@ img {
         flex: 0 0 auto;
     }
 }
+
+
+/* ---------- Phone photo detail (<=767.98px) ---------- */
+
+.pd-actionbar {
+    display: none;
+}
+
+@media (max-width: 767.98px) {
+    /* Bottom nav would collide with the action bar on this page only. */
+    .pd-page .bottom-nav {
+        display: none;
+    }
+
+    .pd-page .page {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+        padding-bottom: 5.5rem;
+    }
+
+    /* Top row: keep the title, drop the desktop action buttons (the
+       sticky bar below replaces them; all strings remain in the DOM). */
+    .pd__actions {
+        display: none;
+    }
+
+    .pd__title {
+        font-size: 1.2rem;
+    }
+
+    /* Tall, nearly edge-to-edge viewer. pan-y: one-finger vertical page
+       scroll keeps working; pinch-zoom stays with the app (see JS). */
+    .pd-viewer__stage {
+        height: min(58vh, 440px);
+        touch-action: pan-y;
+    }
+
+    .pd-viewer__nav {
+        width: 44px;
+        height: 44px;
+    }
+
+    .pd-tip {
+        display: none;
+    }
+
+    .pd-zoom__btn {
+        min-height: 44px;
+        font-size: 0.8rem;
+        padding: 0 0.85rem;
+        flex: 1 1 auto;
+    }
+
+    .pd-zoom__btn--icon {
+        flex: 0 0 44px;
+        padding: 0;
+    }
+
+    .pd-zoom__level {
+        flex: 1 0 100%;
+        margin-left: 0;
+        text-align: right;
+    }
+
+    #details {
+        scroll-margin-top: 4.5rem;
+    }
+
+    /* Sticky action bar, full width above the safe area. */
+    .pd-actionbar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 300;
+        display: flex;
+        align-items: stretch;
+        gap: 0.25rem;
+        padding: 0.4rem 0.5rem calc(0.4rem + env(safe-area-inset-bottom));
+        background: var(--color-surface);
+        border-top: 1px solid var(--color-border);
+        box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.12);
+    }
+
+    .pd-actionbar__btn {
+        flex: 1 1 0;
+        min-width: 0;
+        min-height: 52px;
+        display: inline-flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.2rem;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        color: var(--color-ink);
+        font: inherit;
+        font-size: 0.68rem;
+        font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+        transition: background-color 0.15s ease;
+    }
+
+    .pd-actionbar__btn:active {
+        background: var(--color-primary-soft);
+    }
+
+    .pd-actionbar__btn:focus-visible {
+        outline: none;
+        box-shadow: var(--focus-ring-shadow);
+    }
+
+    .pd-actionbar__label {
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+}
+
+
+/* ---------- Phone insights & cleanup (<=767.98px) ---------- */
+
+@media (max-width: 767.98px) {
+    .panel {
+        padding: 1rem;
+    }
+
+    /* Full-width charts: shrink columns so all 12 months fit at 360px
+       without any horizontal scrolling (wrap's overflow-x stays as a
+       harmless safety net). */
+    .bar-chart-wrap {
+        overflow-x: hidden;
+    }
+
+    .bar-chart {
+        grid-auto-columns: minmax(1.25rem, 1fr);
+        gap: 0.15rem;
+        min-width: 0;
+        margin-top: 0.9rem;
+    }
+
+    .bar-chart__value {
+        font-size: 0.62rem;
+    }
+
+    .bar-chart__month {
+        font-size: 0.6rem;
+    }
+
+    .bar-chart__year {
+        font-size: 0.55rem;
+    }
+
+    /* Category tabs: single horizontally scrollable strip. */
+    .tabbar {
+        margin-bottom: 1rem;
+    }
+
+    .tabbar__list {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+    }
+
+    .tabbar__list::-webkit-scrollbar {
+        display: none;
+    }
+
+    .tabbar__btn {
+        flex: 0 0 auto;
+        white-space: nowrap;
+    }
+
+    /* By-year table becomes stacked cards. Markup (table/td/strong) stays
+       intact for the tests; data-label supplies the row captions. */
+    .insight-table,
+    .insight-table tbody,
+    .insight-table tr,
+    .insight-table td {
+        display: block;
+        width: auto;
+    }
+
+    .insight-table {
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .insight-table thead {
+        display: none;
+    }
+
+    .insight-table tbody tr {
+        background: var(--color-surface-sunken);
+        border: 1px solid var(--color-border-soft);
+        border-radius: var(--radius-md);
+        padding: 0.35rem 0.65rem;
+        margin-bottom: 0.65rem;
+    }
+
+    .insight-table tbody tr:last-child {
+        margin-bottom: 0;
+    }
+
+    .insight-table tbody tr:last-child td,
+    .insight-table td {
+        border-bottom: none;
+    }
+
+    .insight-table td {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.3rem 0;
+        text-align: right;
+    }
+
+    .insight-table td::before {
+        content: attr(data-label);
+        font-size: 0.72rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--color-muted);
+        text-align: left;
+    }
+
+    .insight-table td:first-child {
+        font-size: 1.05rem;
+    }
+
+    .insight-table td:first-child::before {
+        font-size: 0.8rem;
+    }
+
+    /* Photo rows stack: name stays on line 1, meta and action wrap under. */
+    .photo-row {
+        flex-wrap: wrap;
+        row-gap: 0.15rem;
+        padding: 0.7rem 0;
+    }
+
+    .photo-row__name {
+        flex: 1 1 0;
+    }
+
+    .photo-row__meta {
+        flex: 1 0 100%;
+        white-space: normal;
+        font-size: 0.8rem;
+    }
+
+    .photo-row .btn--sm {
+        margin-left: calc(48px + 0.85rem);
+    }
+
+}
+
+
+/* ---------- Phone private gallery lock (<=767.98px) ---------- */
+
+@media (max-width: 767.98px) {
+    /* Full-screen lock screen above the shell but below toasts
+       (top layer dialogs still sit on top of everything). */
+    .private-lock {
+        position: fixed;
+        inset: 0;
+        z-index: 290;
+        max-width: none;
+        margin: 0;
+        padding: calc(1.75rem + env(safe-area-inset-top)) 1.25rem calc(1.75rem + env(safe-area-inset-bottom));
+        border: none;
+        border-radius: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        background: var(--color-bg);
+        text-align: center;
+    }
+
+    body:has(.private-lock) {
+        overflow: hidden;
+    }
+
+    .private-lock__form .field__input {
+        font-size: 16px;
+        min-height: 50px;
+    }
+
+    .private-lock__form .btn--primary {
+        width: 100%;
+        min-height: 52px;
+        font-size: 1.05rem;
+    }
+
+    .private-keypad {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.6rem;
+        margin-top: 1.25rem;
+    }
+
+    .private-keypad__key {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 56px;
+        border: 1px solid var(--surface-border);
+        border-radius: 14px;
+        background: var(--surface);
+        color: var(--text);
+        font: inherit;
+        font-size: 1.4rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.12s ease;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .private-keypad__key:active {
+        background: var(--surface-border);
+    }
+
+    .private-keypad__key:focus-visible {
+        outline: none;
+        box-shadow: var(--focus-ring-shadow);
+    }
+
+    .private-keypad__key--spacer {
+        background: none;
+        border-color: transparent;
+        cursor: default;
+        pointer-events: none;
+    }
+
+    .private-keypad__key--back {
+        font-size: 1rem;
+    }
+}
+
+
+/* ---------- Phone forms, auth & settings (<=767.98px) ---------- */
+
+@media (max-width: 767.98px) {
+    /* 16px minimum: prevents iOS Safari zoom-on-focus. Declared at the same
+       specificity as the existing rules (appended later wins). */
+    input,
+    select,
+    textarea,
+    .field__input,
+    .field select,
+    .field textarea,
+    .pd-field__input {
+        font-size: 16px;
+    }
+
+    /* Full-width fields and forms. */
+    .form,
+    .field {
+        width: 100%;
+    }
+
+    .field--inline,
+    .field--grow {
+        min-width: 0;
+    }
+
+    /* Large primary buttons. btn--sm is excluded from the height bump. */
+    .btn:not(.btn--sm) {
+        min-height: 44px;
+    }
+
+    .btn--primary {
+        min-height: 48px;
+        font-size: 1rem;
+    }
+
+    .form .btn--primary,
+    .form .btn--secondary,
+    .form .btn--danger {
+        width: 100%;
+    }
+
+    /* Existing <dialog> confirmations become bottom sheets (CSS only). */
+    .dialog {
+        position: fixed;
+        inset: auto 0 0 0;
+        top: auto;
+        margin: 0;
+        width: 100%;
+        max-width: none;
+        max-height: min(88vh, 760px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        border-radius: 18px 18px 0 0;
+        border-bottom: none;
+        padding: 1.25rem 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
+        box-shadow: 0 -12px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .dialog__actions {
+        flex-direction: column;
+    }
+
+    .dialog__actions .btn {
+        width: 100%;
+        min-height: 46px;
+    }
+}

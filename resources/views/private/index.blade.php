@@ -58,6 +58,25 @@
 
                     <button type="submit" class="btn btn--primary">Create private gallery</button>
                 </form>
+
+                {{-- Phone-only keypad. Writes straight into #private_password above;
+                     the real input stays in the DOM for autofill and form submit. --}}
+                <div class="private-keypad" data-private-keypad role="group" aria-label="Numeric keypad">
+                    <button type="button" class="private-keypad__key" data-key="1">1</button>
+                    <button type="button" class="private-keypad__key" data-key="2">2</button>
+                    <button type="button" class="private-keypad__key" data-key="3">3</button>
+                    <button type="button" class="private-keypad__key" data-key="4">4</button>
+                    <button type="button" class="private-keypad__key" data-key="5">5</button>
+                    <button type="button" class="private-keypad__key" data-key="6">6</button>
+                    <button type="button" class="private-keypad__key" data-key="7">7</button>
+                    <button type="button" class="private-keypad__key" data-key="8">8</button>
+                    <button type="button" class="private-keypad__key" data-key="9">9</button>
+                    <span class="private-keypad__key private-keypad__key--spacer" aria-hidden="true"></span>
+                    <button type="button" class="private-keypad__key" data-key="0">0</button>
+                    <button type="button" class="private-keypad__key private-keypad__key--back" data-key="back" aria-label="Delete last digit">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
+                    </button>
+                </div>
             </div>
         @elseif ($mode === 'locked')
             <div class="private-lock">
@@ -81,6 +100,25 @@
 
                     <button type="submit" class="btn btn--primary">Unlock</button>
                 </form>
+
+                {{-- Phone-only keypad; writes into #private_password in the form
+                     above without ever logging or storing the digits. --}}
+                <div class="private-keypad" data-private-keypad role="group" aria-label="Numeric keypad">
+                    <button type="button" class="private-keypad__key" data-key="1">1</button>
+                    <button type="button" class="private-keypad__key" data-key="2">2</button>
+                    <button type="button" class="private-keypad__key" data-key="3">3</button>
+                    <button type="button" class="private-keypad__key" data-key="4">4</button>
+                    <button type="button" class="private-keypad__key" data-key="5">5</button>
+                    <button type="button" class="private-keypad__key" data-key="6">6</button>
+                    <button type="button" class="private-keypad__key" data-key="7">7</button>
+                    <button type="button" class="private-keypad__key" data-key="8">8</button>
+                    <button type="button" class="private-keypad__key" data-key="9">9</button>
+                    <span class="private-keypad__key private-keypad__key--spacer" aria-hidden="true"></span>
+                    <button type="button" class="private-keypad__key" data-key="0">0</button>
+                    <button type="button" class="private-keypad__key private-keypad__key--back" data-key="back" aria-label="Delete last digit">
+                        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
+                    </button>
+                </div>
 
                 <details class="private-lock__reset">
                     <summary>Forgot your private password?</summary>

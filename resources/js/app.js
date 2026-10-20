@@ -808,6 +808,37 @@ function initPrivateGate() {
     });
 }
 
+// Phone keypad for the private gallery lock screen. Digits go straight into
+// the existing #private_password input (kept in the DOM for password managers
+// and the normal form submit); nothing is logged, cached, or stored anywhere
+// else, and attempt/lockout handling stays exactly as the server defines it.
+function initPrivateKeypad() {
+    const mq = window.matchMedia('(max-width: 767.98px)');
+    if (!mq.matches) return;
+
+    const pad = document.querySelector('[data-private-keypad]');
+    const input = document.getElementById('private_password');
+    if (!pad || !input) return;
+
+    // Hide the OS keyboard while the on-screen keypad drives the input.
+    // Physical keyboards, autofill, and the confirmation field still work.
+    input.inputMode = 'none';
+    const syncMode = (e) => { input.inputMode = e.matches ? 'none' : ''; };
+    mq.addEventListener?.('change', syncMode);
+
+    pad.addEventListener('click', (e) => {
+        const key = e.target.closest('[data-key]')?.dataset?.key;
+        if (!key) return;
+        if (key === 'back') {
+            input.value = input.value.slice(0, -1);
+        } else if (input.value.length < 128) {
+            input.value += key;
+        }
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.focus();
+    });
+}
+
 /* ---------------- Photo zoom ---------------- */
 
 function initZoom() {
@@ -917,7 +948,130 @@ function initZoom() {
                 e.preventDefault();
                 next.click();
             }
+        }
+    });
+
+    // Phone: two-finger pinch to zoom. Scoped to the viewer stage only;
+    // `touch-action: pan-y` on the stage keeps one-finger page scroll and
+    // browser zoom outside the viewer untouched. Neutralizes the pan offset
+    // while a pinch is active so the two handlers don't fight.
+    if (stage) {
+        const pointers = new Map();
+        let pinchStartDist = 0;
+        let pinchStartScale = 1;
+
+        stage.addEventListener('pointerdown', (e) => {
+            if (e.pointerType === 'mouse') return;
+            pointers.set(e.pointerId, e);
+        });
+
+        stage.addEventListener('pointermove', (e) => {
+            if (!pointers.has(e.pointerId)) return;
+            pointers.set(e.pointerId, e);
+            if (pointers.size !== 2) return;
+            const [a, b] = Array.from(pointers.values());
+            const dist = Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+            if (!pinchStartDist) {
+                pinchStartDist = dist;
+                pinchStartScale = scale;
+                return;
+            }
+            scale = clamp(pinchStartScale * (dist / pinchStartDist));
+            offsetX = 0;
+            offsetY = 0;
+            apply();
+        });
+
+        const endPinch = (e) => {
+            pointers.delete(e.pointerId);
+            if (pointers.size < 2) {
+                pinchStartDist = 0;
+                if (scale <= 1) resetPan();
+                apply();
+            }
+        };
+        stage.addEventListener('pointerup', endPinch);
+        stage.addEventListener('pointercancel', endPinch);
+    }
 }
+
+/* ---------------- Phone photo detail (<=767.98px) ---------------- */
+
+function initPhoneViewer() {
+    const mq = window.matchMedia('(max-width: 767.98px)');
+    const stage = document.getElementById('zoom-stage');
+    const img = document.getElementById('zoom-image');
+    if (!stage || !img) return;
+
+    // Swipe only when server-rendered prev/next links exist (no controller
+    // changes). Passive listeners: never block page scroll or browser zoom.
+    const prev = document.querySelector('.pd-viewer__nav--prev');
+    const next = document.querySelector('.pd-viewer__nav--next');
+    if (!prev && !next) return;
+
+    const zoomedIn = () => {
+        const text = document.getElementById('zoom-level')?.textContent || '100%';
+        return (parseFloat(text) || 100) > 100;
+    };
+
+    let startX = 0;
+    let startY = 0;
+    let tracking = false;
+
+    stage.addEventListener('touchstart', (e) => {
+        if (!mq.matches || e.touches.length !== 1 || zoomedIn()) return;
+        tracking = true;
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+    }, { passive: true });
+
+    stage.addEventListener('touchend', (e) => {
+        if (!tracking) return;
+        tracking = false;
+        if (!mq.matches) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - startX;
+        const dy = t.clientY - startY;
+        if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+        const link = dx < 0 ? next : prev;
+        if (link) window.location.href = link.href;
+    }, { passive: true });
+}
+
+function initPhoneActionbar() {
+    const bar = document.querySelector('.pd-actionbar');
+    if (!bar) return;
+    const mq = window.matchMedia('(max-width: 767.98px)');
+
+    // Archive/Unarchive: proxy-click the existing page form so behavior
+    // (method, redirect, flash) is identical to the desktop button.
+    bar.querySelector('[data-pd-archive]')?.addEventListener('click', () => {
+        if (!mq.matches) return;
+        const form = document.querySelector('.js-archive-photo-form')
+            || document.querySelector('.pd-inline-form[action*="/unarchive"]');
+        form?.querySelector('button[type="submit"]')?.click();
+    });
+
+    // Rotate: proxy-click the existing rotate-right form.
+    bar.querySelector('[data-pd-rotate]')?.addEventListener('click', () => {
+        if (!mq.matches) return;
+        document.querySelector('.pd-inline-form input[name="direction"][value="right"]')
+            ?.closest('form')
+            ?.querySelector('button[type="submit"]')
+            ?.click();
+    });
+}
+
+/* ---------------- PWA service worker ---------------- */
+
+function initServiceWorker() {
+    if (!('serviceWorker' in navigator)) return;
+    if (!/^https?:$/.test(window.location.protocol)) return;
+
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {
+            /* offline support is a progressive enhancement */
+        });
     });
 }
 
@@ -1885,7 +2039,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initBulkSelect();
     initDialogs();
     initPrivateGate();
+    initPrivateKeypad();
     initZoom();
+    initPhoneViewer();
+    initPhoneActionbar();
     initFilters();
     initFilterSheet();
     initTabBars();
@@ -1905,4 +2062,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initPasswordRules();
     initLandingScreen();
     initAuthCard();
+    initServiceWorker();
 });

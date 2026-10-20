@@ -243,7 +243,7 @@
                         <label class="field__label" for="phone">Mobile number</label>
                         <div class="field__control">
                             <span class="field__icon">{!! $phoneIcon !!}</span>
-                            <input class="field__input" id="phone" type="text" name="phone" value="{{ old('phone') }}"
+                            <input class="field__input" id="phone" type="tel" name="phone" value="{{ old('phone') }}"
                                    autocomplete="tel" placeholder="09XXXXXXXXX or +639XXXXXXXXX"
                                    aria-describedby="phone-hint"
                                    @error('phone') aria-invalid="true" aria-describedby="phone-hint phone-error" @enderror>
