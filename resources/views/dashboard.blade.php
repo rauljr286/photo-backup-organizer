@@ -20,6 +20,7 @@
             <x-upload-dropzone :album-id="$activeAlbum"></x-upload-dropzone>
 
             <section class="filter-bar" id="filter-sheet" aria-labelledby="filter-heading">
+                <span class="filter-sheet__handle" aria-hidden="true"></span>
                 <h2 class="filter-bar__title" id="filter-heading">Filter your photos</h2>
                 <button type="button" class="filter-bar__close" data-filter-close aria-label="Close filters">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">

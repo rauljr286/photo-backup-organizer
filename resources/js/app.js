@@ -1995,6 +1995,40 @@ function initFilterSheet() {
         closeBtn?.addEventListener('click', () => setOpen(false));
         backdrop?.addEventListener('click', () => setOpen(false));
 
+        // Drag the handle down to dismiss (phone only; the handle is hidden
+        // above 768px and the sheet has no transform state there).
+        const handle = sheet.querySelector('.filter-sheet__handle');
+        if (handle && sheet.classList.contains('filter-bar')) {
+            let startY = 0;
+            let dragging = false;
+            handle.addEventListener('touchstart', (e) => {
+                if (window.innerWidth >= 768) return;
+                dragging = true;
+                startY = e.touches[0].clientY;
+            }, { passive: true });
+            handle.addEventListener('touchmove', (e) => {
+                if (!dragging) return;
+                const dy = Math.max(0, e.touches[0].clientY - startY);
+                sheet.style.transition = 'none';
+                sheet.style.transform = `translateY(${dy}px)`;
+            }, { passive: true });
+            const endDrag = (e) => {
+                if (!dragging) return;
+                dragging = false;
+                sheet.style.transition = '';
+                sheet.style.transform = '';
+                const dy = (e.changedTouches?.[0]?.clientY ?? startY) - startY;
+                if (dy > 80) setOpen(false);
+            };
+            handle.addEventListener('touchend', endDrag);
+            handle.addEventListener('touchcancel', endDrag);
+        }
+
+        // Never leave the sheet open on first paint or when returning from
+        // the back/forward cache - it must start closed and only open on tap.
+        setOpen(false);
+        window.addEventListener('pageshow', () => setOpen(false));
+
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && isOpen()) {
                 e.preventDefault();
