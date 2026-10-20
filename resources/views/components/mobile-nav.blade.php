@@ -64,7 +64,7 @@
     </div>
 </nav>
 
-{{-- Phone (<=767.98px) bottom bar: the five-tab app layout. The bar above keeps
+{{-- Phone (<=767.98px) bottom bar. The bar above keeps
      its current 768-899.98px behaviour untouched; CSS swaps between the two. --}}
 <nav class="bottom-nav bottom-nav--phone" aria-label="Primary">
     @foreach ($phoneTabs as $item)

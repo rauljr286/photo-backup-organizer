@@ -6525,8 +6525,8 @@ img {
 
 /* ---------- Phone app shell (<=767.98px) ----------
  * The 768-899.98px band keeps the original bottom bar and top bar exactly as
- * before; phones below 768px swap in the phone-specific bottom bar (five tabs
- * + More), a compact title row with an optional back button, safe-area
+ * before; phones below 768px swap in the phone-specific bottom bar (Dashboard,
+ * Albums, Insights, Upload, Settings + More), a compact title row with an optional back button, safe-area
  * padding, 44px touch targets and press feedback. */
 
 .bottom-nav--phone,
@@ -7284,5 +7284,985 @@ img {
     .dashboard .dashboard__top-actions .btn,
     .dashboard > .hero .btn {
         min-height: 44px;
+    }
+}
+
+
+/* ---------- Phone filter sheet: CSS-owned closed state (<=767.98px) ----------
+ * The closed state must not depend on JavaScript. By default (no .is-open,
+ * no body.filter-sheet-open) the sheet and backdrop are fully hidden with
+ * visibility + pointer-events, not merely translated off-screen (a
+ * percentage translate can leak on mobile browsers with a dynamic viewport
+ * / URL bar). JS only ever ADDS the open state. */
+
+@media (max-width: 767.98px) {
+    .filter-bar {
+        visibility: hidden;
+        pointer-events: none;
+        transform: translateY(100%);
+    }
+
+    .filter-bar.is-open {
+        visibility: visible;
+        pointer-events: auto;
+        transform: translateY(0);
+    }
+
+    /* Backdrop is inert and invisible unless the sheet is open. */
+    .filter-sheet-backdrop {
+        display: none;
+        opacity: 0;
+        pointer-events: none;
+        visibility: hidden;
+    }
+
+    body.filter-sheet-open .filter-sheet-backdrop {
+        display: block;
+        opacity: 1;
+        pointer-events: auto;
+        visibility: visible;
+    }
+
+    /* When open, the sheet's own backdrop is the only overlay; ensure the
+       tab bar stays put (it is hidden only via body.filter-sheet-open). */
+    body:not(.filter-sheet-open) .bottom-nav--phone {
+        display: flex;
+    }
+}
+
+/* =====================================================================
+   Phone compact pass (<=767.98px)
+   ---------------------------------------------------------------------
+   Phones were oversized: cards, buttons, headings, icons and padding all
+   used the desktop scale, so every page ran 3-4 screens tall. This block
+   makes the phone layout denser while keeping the same look (colors,
+   fonts, style). Everything here is scoped to max-width: 767.98px so the
+   desktop and the 768-899.98px legacy bottom-nav band are untouched.
+   Sizes flow through the --m-* variables below for consistency.
+   ===================================================================== */
+
+@media (max-width: 767.98px) {
+    :root {
+        /* Spacing scale */
+        --m-pad: 12px;
+        --m-gap: 10px;
+        --m-radius: 12px;
+
+        /* Type scale */
+        --m-text: 15px;
+        --m-line: 1.45;
+        --m-title: 21px;
+        --m-title-sm: 17px;
+        --m-sub: 13px;
+
+        /* Controls */
+        --m-tap-primary: 44px;
+        --m-tap-secondary: 40px;
+        --m-tap-inline: 36px;
+        --m-tap-gap: 8px;
+    }
+
+    /* ---------------- Global density: type, page padding, gaps -------- */
+
+    body {
+        font-size: var(--m-text);
+        line-height: var(--m-line);
+    }
+
+    .page {
+        padding: 0.75rem var(--m-pad) 2rem;
+    }
+
+    /* Page + section titles */
+    .page-title {
+        font-size: var(--m-title);
+        margin: 0 0 0.2rem;
+    }
+
+    .page-subtitle {
+        font-size: var(--m-sub);
+    }
+
+    .section-head {
+        gap: 0.6rem;
+    }
+
+    .section-head__icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 11px;
+    }
+
+    .section-head__icon svg {
+        width: 20px;
+        height: 20px;
+    }
+
+    .section-head__text {
+        flex: 1 1 180px;
+    }
+
+    .section-head__title {
+        font-size: var(--m-title);
+    }
+
+    .section-head__subtitle {
+        font-size: var(--m-sub);
+        margin-top: 0.1rem;
+    }
+
+    .section-head__actions {
+        gap: var(--m-tap-gap);
+    }
+
+    /* Panels / cards */
+    .panel {
+        padding: var(--m-pad);
+        border-radius: var(--m-radius);
+    }
+
+    .panel__heading {
+        font-size: var(--m-title-sm);
+        margin-bottom: 0.6rem;
+    }
+
+    .panel__subheading {
+        margin: 0.75rem 0 0.35rem;
+        font-size: var(--m-sub);
+    }
+
+    .empty-note {
+        font-size: var(--m-sub);
+    }
+
+    /* Vertical rhythm between stacked page blocks */
+    .dashboard__body {
+        gap: var(--m-gap);
+    }
+
+    .dashboard,
+    .albums,
+    .insights-page {
+        gap: var(--m-gap);
+    }
+
+    .dashboard__top {
+        gap: var(--m-gap);
+    }
+
+    .dashboard__top-actions {
+        gap: var(--m-tap-gap);
+    }
+
+    .insights-grid {
+        gap: var(--m-gap);
+    }
+
+    /* ---------------- Buttons ---------------------------------------- */
+
+    .btn {
+        font-size: var(--m-text);
+        padding: 0 14px;
+    }
+
+    /* Primary controls stay comfortable to tap. */
+    .btn:not(.btn--sm):not(.btn--icon) {
+        min-height: var(--m-tap-primary);
+    }
+
+    .btn--primary {
+        min-height: var(--m-tap-primary);
+        font-size: var(--m-text);
+    }
+
+    /* Secondary (ghost/secondary/danger-ghost) controls. */
+    .btn--sm {
+        min-height: var(--m-tap-inline);
+        padding: 0 12px;
+        font-size: 14px;
+    }
+
+    .btn--icon {
+        width: var(--m-tap-primary);
+        height: var(--m-tap-primary);
+    }
+
+    /* Small inline buttons need >=8px between them. */
+    .album-card__actions,
+    .photo-card__actions,
+    .dialog__actions,
+    .section-head__actions {
+        gap: var(--m-tap-gap);
+    }
+
+    /* ---------------- Inputs ---------------------------------------- */
+
+    /* 16px keeps iOS from zooming; height 44px keeps them tappable. */
+    input,
+    select,
+    textarea,
+    .field__input,
+    .field select,
+    .field textarea,
+    .pd-field__input {
+        font-size: 16px;
+        min-height: var(--m-tap-primary);
+    }
+
+    .field__hint,
+    .field__label,
+    .field__label--compact {
+        font-size: var(--m-sub);
+    }
+
+    /* ---------------- Top bar (48px) -------------------------------- */
+
+    .topbar__inner {
+        padding: 0.4rem var(--m-pad);
+        gap: 0.5rem;
+    }
+
+    .topbar__brand {
+        font-size: 1rem;
+        gap: 0.45rem;
+    }
+
+    .topbar__brand .brand__icon {
+        width: 26px;
+        height: 26px;
+    }
+
+    .topbar__mobile {
+        min-height: 48px;
+        padding: 0.15rem var(--m-pad) 0.4rem;
+    }
+
+    .topbar__mobile-title {
+        font-size: 0.95rem;
+    }
+
+    /* ---------------- Bottom tab bar (56px + safe area) -------------- */
+
+    .bottom-nav {
+        padding: 0.25rem 0.3rem calc(0.25rem + env(safe-area-inset-bottom, 0px));
+        gap: 0.1rem;
+    }
+
+    .bottom-nav__item {
+        min-height: 56px;
+        gap: 0.1rem;
+        padding: 0.3rem 0.1rem 0.35rem;
+        font-size: 11px;
+    }
+
+    .bottom-nav__icon {
+        width: 22px;
+        height: 22px;
+    }
+
+    .bottom-nav__label {
+        font-size: 11px;
+        line-height: 1.05;
+    }
+
+    .bottom-nav__badge {
+        top: -0.35rem;
+        right: -0.5rem;
+    }
+
+    /* "Dashboard" is the longest label; nudge tracking in so it never
+       truncates at 360px without hiding width from anything else. */
+    .bottom-nav--phone .bottom-nav__label {
+        letter-spacing: -0.01em;
+    }
+
+    /* Content clears the 56px bar. */
+    .app-main {
+        padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 0.5rem);
+    }
+
+    /* ---------------- Toasts ---------------------------------------- */
+
+    .toast-region {
+        left: 0.75rem;
+        right: 0.75rem;
+        bottom: calc(56px + 8px + env(safe-area-inset-bottom, 0px));
+        max-width: none;
+    }
+
+    .toast {
+        padding: 10px 12px;
+        font-size: 14px;
+        gap: 0.6rem;
+    }
+}
+
+
+/* ---------------- Dashboard: shorter hero ------------------------- */
+
+@media (max-width: 767.98px) {
+    .hero {
+        min-height: 0;
+        padding: 1rem var(--m-pad);
+        border-radius: var(--m-radius);
+        margin-bottom: var(--m-gap);
+    }
+
+    .dashboard > .hero .hero__content,
+    .hero__content {
+        padding-bottom: 0.75rem;
+    }
+
+    .dashboard > .hero .hero__content--profile {
+        gap: 0.6rem;
+    }
+
+    .hero__avatar .avatar--lg {
+        width: 56px;
+        height: 56px;
+    }
+
+    .hero__eyebrow {
+        font-size: 0.68rem;
+        margin-bottom: 0.25rem;
+        letter-spacing: 0.1em;
+    }
+
+    .hero__title {
+        font-size: 20px;
+    }
+
+    .hero__subtitle {
+        font-size: var(--m-sub);
+        margin-top: 0.3rem;
+    }
+
+    /* Stats: compact 2-column grid (was a single stacked column). */
+    .dashboard > .hero .hero__stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--m-gap);
+        margin-top: 0.75rem;
+    }
+
+    .dashboard > .hero .hero__stats .stat,
+    .hero__stats .stat {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+        padding: 0.6rem 0.7rem;
+        border-radius: var(--m-radius);
+    }
+
+    .stat__icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+    }
+
+    .stat__icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .stat__value {
+        font-size: 1.15rem;
+    }
+
+    .stat__label {
+        font-size: 0.78rem;
+    }
+
+    /* Storage note wraps under the value instead of five lines in-tile. */
+    .stat__note {
+        font-size: 0.72rem;
+        margin-top: 0.05rem;
+    }
+
+    /* Filter trigger: compact pill. */
+    .filter-sheet-trigger {
+        min-height: var(--m-tap-secondary);
+        padding: 0.4rem 0.85rem;
+        border-radius: 10px;
+        font-size: var(--m-text);
+    }
+
+    /* Section head action buttons stack neatly. */
+    .dashboard .section-head__actions,
+    .dashboard__top-actions {
+        gap: var(--m-tap-gap);
+    }
+
+    .dashboard .section-head__actions .btn,
+    .dashboard__top-actions .btn {
+        min-height: var(--m-tap-primary);
+    }
+}
+
+/* ---------------- Insights: compact stat grid --------------------- */
+
+@media (max-width: 767.98px) {
+    /* Insights stat tiles: 2 columns, ~90px tall. */
+    .insights-page .stat-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--m-gap);
+    }
+
+    .insights-page .stat-grid .stat {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.4rem;
+        padding: 0.7rem;
+        min-height: 90px;
+        border-radius: var(--m-radius);
+    }
+
+    .insights-page .stat-grid .stat__icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+    }
+
+    .insights-page .stat-grid .stat__icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .insights-page .stat-grid .stat__value {
+        font-size: 1.375rem;
+    }
+
+    .insights-page .stat-grid .stat__label {
+        font-size: 0.75rem;
+        line-height: 1.2;
+    }
+}
+
+/* ---------------- Settings: profile hero + tiles ------------------ */
+
+@media (max-width: 767.98px) {
+    .profile > .hero {
+        padding: 0.9rem var(--m-pad);
+        margin-bottom: var(--m-gap);
+    }
+
+    .profile__head-title {
+        font-size: var(--m-title-sm);
+    }
+
+    .profile__head-sub {
+        font-size: var(--m-sub);
+        margin-top: 0.15rem;
+    }
+
+    .profile__body {
+        gap: var(--m-gap);
+    }
+
+    /* Settings tab buttons: 2 per row, 40px tall. */
+    .profile__tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--m-tap-gap);
+    }
+
+    .profile__tab {
+        min-height: var(--m-tap-secondary);
+        padding: 0.4rem 0.6rem;
+        font-size: var(--m-sub);
+        gap: 0.4rem;
+        white-space: normal;
+        border-radius: 10px;
+    }
+
+    .profile__tab-icon {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Profile panel + picture */
+    .profile__panel {
+        padding: var(--m-pad);
+        border-radius: var(--m-radius);
+    }
+
+    .profile__panel--profile {
+        grid-template-columns: minmax(0, 1fr);
+        column-gap: 0;
+        row-gap: 0.75rem;
+    }
+
+    .profile__card-title {
+        font-size: var(--m-title-sm);
+        margin-bottom: 0.6rem;
+    }
+
+    .profile__picture {
+        gap: 0.9rem;
+    }
+
+    .profile__avatar-col {
+        width: auto;
+    }
+
+    .profile__avatar .avatar,
+    .profile__avatar .avatar--lg {
+        width: 72px;
+        height: 72px;
+    }
+
+    /* "Upload photo" button 40px. */
+    .profile__upload {
+        min-height: var(--m-tap-secondary);
+        padding: 0.4rem 0.85rem;
+        font-size: var(--m-sub);
+    }
+
+    .profile__rows {
+        margin-top: 0.75rem;
+    }
+
+    .profile__row {
+        min-height: 42px;
+        padding: 0.5rem 0;
+        font-size: var(--m-sub);
+        gap: 0.6rem;
+    }
+
+    .profile-page .profile__edit {
+        min-height: var(--m-tap-inline);
+        font-size: var(--m-sub);
+    }
+
+    .profile__note {
+        font-size: var(--m-sub);
+        line-height: 1.4;
+    }
+
+    .profile__privacy-text {
+        font-size: var(--m-sub);
+    }
+
+    /* Storage summary: a small full-width line, not a five-line tile. */
+    .profile > .hero .stat__note {
+        display: block;
+        width: 100%;
+        white-space: normal;
+    }
+}
+
+/* ---------------- Albums index: compact header + cards ------------ */
+
+@media (max-width: 767.98px) {
+    .albums .section-head__icon {
+        width: 40px;
+        height: 40px;
+    }
+
+    .albums .section-head__title {
+        font-size: 22px;
+    }
+
+    /* "Create a new album" card */
+    .albums .panel .form--row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--m-tap-gap);
+    }
+
+    .albums .panel .form--row .field--grow {
+        width: 100%;
+    }
+
+    .albums .panel .form--row .btn {
+        width: 100%;
+        min-height: var(--m-tap-primary);
+    }
+
+    .album-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--m-gap);
+    }
+
+    /* Album card: icon, name, count on one row; actions in one row. */
+    .album-card {
+        padding: 0.7rem;
+        gap: 0.5rem;
+        border-radius: var(--m-radius);
+    }
+
+    .album-card__link {
+        display: flex;
+        align-items: center;
+        gap: 0.55rem;
+    }
+
+    .album-card__icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 9px;
+        flex-shrink: 0;
+    }
+
+    .album-card__icon svg {
+        width: 18px;
+        height: 18px;
+    }
+
+    .album-card__name {
+        font-size: 0.95rem;
+        margin: 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .album-card__count {
+        font-size: 0.75rem;
+        margin-left: auto;
+        white-space: nowrap;
+    }
+
+    .album-card__actions {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 6px;
+        padding-top: 0.5rem;
+    }
+
+    .album-card__actions .btn {
+        min-height: var(--m-tap-inline);
+        padding: 0 0.35rem;
+        font-size: 12.5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+}
+
+/* ---------------- Upload dropzone: compact ------------------------ */
+
+@media (max-width: 767.98px) {
+    .dropzone {
+        padding: var(--m-pad);
+        border-radius: var(--m-radius);
+    }
+
+    .dropzone__area {
+        padding: 0.9rem 0.75rem;
+    }
+
+    .dropzone__icon {
+        margin: 0 auto 0.35rem;
+    }
+
+    .dropzone__icon svg {
+        width: 40px;
+        height: 40px;
+    }
+
+    .dropzone__hint {
+        margin-top: 0.5rem;
+        font-size: var(--m-sub);
+    }
+
+    /* "Choose photos" / "Take photo": side by side if they fit, else stacked. */
+    .dropzone__phone-actions {
+        flex-direction: row;
+        flex-wrap: wrap;
+        gap: var(--m-tap-gap);
+        margin-top: 0.6rem;
+    }
+
+    .dropzone__phone-btn {
+        flex: 1 1 140px;
+        min-height: var(--m-tap-primary);
+        font-size: var(--m-text);
+        padding: 0 0.75rem;
+    }
+
+    .upload-item {
+        row-gap: 0.35rem;
+        padding: 0.5rem 0;
+    }
+}
+
+/* ---------------- Archive: compact meta + full-width restore ------ */
+
+@media (max-width: 767.98px) {
+    /* Keep 2 columns (handled by the existing phone photo-grid rule). */
+    .photo-card__caption {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.1rem;
+        padding: 0.4rem 0.5rem 0.25rem;
+        font-size: 12px;
+    }
+
+    .photo-card__date {
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .photo-card__size {
+        font-size: 11px;
+    }
+
+    .photo-card__actions {
+        padding: 0.4rem 0.5rem 0.5rem;
+        gap: 6px;
+    }
+
+    /* Archive "Restore" button: full width of the card, 40px. */
+    .photo-grid .photo-card__actions .inline-form {
+        width: 100%;
+        margin: 0;
+    }
+
+    .photo-grid .photo-card__actions .inline-form .btn {
+        width: 100%;
+        min-height: var(--m-tap-secondary);
+    }
+
+    .photo-card__flag {
+        font-size: 0.65rem;
+        padding: 0.15rem 0.4rem;
+    }
+}
+
+/* ---------------- Photo grids: tighter caption -------------------- */
+
+@media (max-width: 767.98px) {
+    .photo-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    .photo-card {
+        border-radius: var(--m-radius);
+    }
+
+    .photo-card__img {
+        aspect-ratio: 1 / 1;
+    }
+}
+
+/* ---------------- Cleanup + private: compact rows ----------------- */
+
+@media (max-width: 767.98px) {
+    .tabbar {
+        margin-bottom: 0.6rem;
+    }
+
+    .tabbar__btn {
+        min-height: var(--m-tap-secondary);
+        padding: 0.35rem 0.7rem;
+        font-size: var(--m-sub);
+        gap: 0.35rem;
+    }
+
+    .photo-row {
+        gap: 0.6rem;
+        padding: 0.5rem 0;
+    }
+
+    .photo-row__thumb {
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+    }
+
+    .photo-row__name {
+        font-size: var(--m-sub);
+    }
+
+    .photo-row__meta {
+        font-size: 12px;
+    }
+
+    .photo-row .btn--sm {
+        min-height: var(--m-tap-inline);
+        font-size: 12.5px;
+    }
+
+    .duplicate-group__title {
+        font-size: 0.9rem;
+    }
+
+    .private-gallery .dropzone {
+        margin-bottom: var(--m-gap);
+    }
+}
+
+/* ---------------- Filter bottom sheet + dialogs ------------------- */
+
+@media (max-width: 767.98px) {
+    .filter-bar {
+        padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+        max-height: 70dvh;
+    }
+
+    .filter-bar__title {
+        font-size: var(--m-title-sm);
+        margin-bottom: 0.4rem;
+    }
+
+    /* Two-column grid: Search/Tags/actions span both columns, From and To
+       sit side by side in one row. (Both the hidden album input and the
+       fields are direct children, so target the date fields by their
+       inputs with :has().) */
+    .filter-form {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: var(--m-tap-gap);
+        align-items: end;
+    }
+
+    .filter-form .field {
+        gap: 0.25rem;
+    }
+
+    .filter-form .field--inline {
+        grid-column: 1 / -1;
+    }
+
+    .filter-form .field--inline:has(#from),
+    .filter-form .field--inline:has(#to) {
+        grid-column: span 1;
+    }
+
+    .filter-bar__actions {
+        display: flex;
+        grid-column: 1 / -1;
+        gap: var(--m-tap-gap);
+        margin-top: 0.35rem;
+    }
+
+    .filter-bar__actions .btn {
+        flex: 1 1 0;
+        min-height: var(--m-tap-primary);
+    }
+
+    .filter-sheet__handle {
+        margin-bottom: 0.5rem;
+    }
+
+    /* Dialogs: 14px padding, 17px title, 8px between fields. */
+    .dialog {
+        padding: 14px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+        max-height: 70dvh;
+        border-radius: 16px 16px 0 0;
+    }
+
+    .dialog__title {
+        font-size: var(--m-title-sm);
+        margin-bottom: 0.4rem;
+    }
+
+    .dialog .form {
+        gap: var(--m-tap-gap);
+    }
+
+    .dialog__actions {
+        gap: var(--m-tap-gap);
+        margin-top: 0.35rem;
+    }
+
+    .dialog__actions .btn {
+        min-height: var(--m-tap-primary);
+    }
+}
+
+/* ---------------- Background watermark ---------------------------- */
+
+@media (max-width: 767.98px) {
+    /* The camera pattern scaled to 300px showed as a few huge ghost
+       cameras behind text. Shrink it well below text size and fade it so
+       it never competes with content. */
+    .app-shell {
+        background-size: cover, 96px 96px;
+        background-attachment: scroll, scroll;
+    }
+
+    .app-shell {
+        background-image:
+            linear-gradient(rgba(243, 242, 238, 0.94), rgba(243, 242, 238, 0.94)),
+            var(--camera-pattern);
+    }
+}
+
+@media (max-width: 767.98px) {
+    html.theme-dark .app-shell,
+    .theme-dark .app-shell {
+        background-size: cover, 96px 96px;
+        background-attachment: scroll, scroll;
+    }
+}
+
+/* ---------------- Guest / auth pages: compact --------------------- */
+
+@media (max-width: 767.98px) {
+    .page--guest {
+        padding: 1rem 0.75rem 1.5rem;
+    }
+
+    .auth-shell {
+        gap: var(--m-gap);
+    }
+
+    .auth-shell__brand {
+        font-size: 1.05rem;
+    }
+
+    .auth-card {
+        padding: var(--m-pad);
+        border-radius: var(--m-radius);
+    }
+
+    .auth-card__heading {
+        font-size: 1.375rem;
+    }
+
+    .auth-card__lead {
+        font-size: var(--m-sub);
+    }
+
+    .auth-card .form {
+        gap: var(--m-tap-gap);
+    }
+
+    .auth-card .btn--block {
+        min-height: var(--m-tap-primary);
+    }
+}
+
+/* ---------------- Phone compact pass: tap-target fixes ------------ */
+
+@media (max-width: 767.98px) {
+    /* Password reveal buttons: >=36px tap target. */
+    .password-toggle {
+        width: var(--m-tap-inline);
+        height: var(--m-tap-inline);
+        right: 0.25rem;
+    }
+
+    /* Album picker chips inside photo detail: small inline button min 36px. */
+    .pd-album__btn {
+        min-height: var(--m-tap-inline);
+        font-size: 12.5px;
+        padding: 0.35rem 0.5rem;
+    }
+
+    /* Photo-card selection checkbox: keep a >=36px hit area on the label. */
+    .photo-card__check {
+        min-width: var(--m-tap-inline);
+        min-height: var(--m-tap-inline);
+        justify-content: center;
+        margin: 0;
+    }
+
+    .field__checkbox {
+        width: 1.25rem;
+        height: 1.25rem;
     }
 }
