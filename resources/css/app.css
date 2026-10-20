@@ -6728,3 +6728,56 @@ img {
         overflow: hidden;
     }
 }
+
+/* ---------- Phone upload (<=767.98px) ----------
+ * Phones get two big full-width buttons — "Choose photos" and "Take photo"
+ * (a second file input with capture="environment") — and stacked per-file
+ * progress rows. Above 768px the phone actions stay hidden and the dropzone
+ * keeps its desktop layout. */
+
+.dropzone__phone-actions {
+    display: none;
+}
+
+@media (max-width: 767.98px) {
+    .dropzone__title,
+    #pick-files {
+        display: none;
+    }
+
+    .dropzone__phone-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+        margin-top: 0.9rem;
+    }
+
+    .dropzone__phone-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        width: 100%;
+        min-height: 52px;
+        font-size: 1rem;
+    }
+
+    .upload-item {
+        flex-wrap: wrap;
+        row-gap: 0.5rem;
+    }
+
+    .upload-item__name {
+        flex: 1 1 100%;
+    }
+
+    .upload-item__progress {
+        width: auto;
+        flex: 1;
+    }
+
+    .upload-item__status {
+        min-width: 0;
+        flex: 0 0 auto;
+    }
+}

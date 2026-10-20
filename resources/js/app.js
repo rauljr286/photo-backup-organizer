@@ -117,6 +117,7 @@ function initUploads() {
         const openPicker = () => input.click();
 
         picker.addEventListener('click', openPicker);
+        zone.querySelector('#pick-files-phone')?.addEventListener('click', openPicker);
         target.addEventListener('click', (e) => {
             if (e.target.closest('button')) return;
             openPicker();
@@ -150,6 +151,15 @@ function initUploads() {
             if (files.length) upload(files);
             input.value = '';
         });
+
+        const cameraInput = zone.querySelector('#photo-camera-input');
+        if (cameraInput) {
+            cameraInput.addEventListener('change', () => {
+                const files = Array.from(cameraInput.files || []);
+                if (files.length) upload(files);
+                cameraInput.value = '';
+            });
+        }
 
         function upload(files) {
             const batch = state.batch || (state.batch = { total: 0, entries: new Set() });
@@ -1851,11 +1861,27 @@ function initFilterSheet() {
     });
 }
 
+/* ---------------- Upload tab (phone) ---------------- */
+
+/* The phone Upload tab links to /dashboard#upload. When the dashboard is
+ * already on screen the click opens the picker straight away; from another
+ * page the link just navigates and the browser scrolls to the drop zone. */
+function initUploadTab() {
+    document.querySelectorAll('a[href$="#upload"]').forEach((link) => {
+        link.addEventListener('click', () => {
+            const path = window.location.pathname.replace(/\/+$/, '') || '/';
+            if (path !== '/dashboard') return;
+            document.querySelector('[data-upload-zone] #pick-files')?.click();
+        });
+    });
+}
+
 /* ---------------- Bootstrap ---------------- */
 
 document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     initUploads();
+    initUploadTab();
     initBulkSelect();
     initDialogs();
     initPrivateGate();
