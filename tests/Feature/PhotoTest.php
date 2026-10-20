@@ -152,7 +152,7 @@ class PhotoTest extends TestCase
         $mock = \Mockery::mock(PhotoStorageService::class)->makePartial();
         $mock->shouldReceive('store')
             ->once()
-            ->with($this->callback(fn ($file) => $file->getClientOriginalName() === 'good.jpg'), $this->anything(), $this->anything(), $this->anything())
+            ->with($this->callback(fn ($file) => $file->getClientOriginalName() === 'good.jpg'), $this->anything(), $this->anything(), $this->anything(), $this->anything())
             ->andThrow(new \RuntimeException('Disk write failed'));
         $this->instance(PhotoStorageService::class, $mock);
 
@@ -718,6 +718,41 @@ class PhotoTest extends TestCase
         $this->actingAs($this->stranger)
             ->post("/photos/{$photo->id}/rotate", ['direction' => 'left'])
             ->assertStatus(403);
+    }
+
+    public function test_latest_endpoint_returns_only_photos_newer_than_the_given_id(): void
+    {
+        $first = $this->uploadFor($this->owner, 'first.jpg', 320, 240);
+        $second = $this->uploadFor($this->owner, 'second.jpg', 321, 240);
+
+        $response = $this->actingAs($this->owner)
+            ->getJson("/photos/latest?after={$first->id}")
+            ->assertOk()
+            ->assertJsonStructure(['photos' => [['id', 'url', 'thumbnail_url', 'description', 'taken_at']], 'latest_id']);
+
+        $ids = collect($response->json('photos'))->pluck('id');
+
+        $this->assertTrue($ids->contains($second->id));
+        $this->assertFalse($ids->contains($first->id));
+        $this->assertSame($second->id, $response->json('latest_id'));
+    }
+
+    public function test_latest_endpoint_only_returns_the_owners_photos(): void
+    {
+        $mine = $this->uploadFor($this->owner, 'mine.jpg');
+        $theirs = $this->uploadFor($this->stranger, 'theirs.jpg');
+
+        $ids = collect(
+            $this->actingAs($this->owner)->getJson('/photos/latest?after=0')->assertOk()->json('photos')
+        )->pluck('id');
+
+        $this->assertTrue($ids->contains($mine->id));
+        $this->assertFalse($ids->contains($theirs->id));
+    }
+
+    public function test_guests_cannot_use_the_latest_endpoint(): void
+    {
+        $this->getJson('/photos/latest')->assertStatus(401);
     }
 
     private function uploadFor(User $user, string $name = 'holiday-sunset.jpg', int $width = 320, int $height = 240): Photo

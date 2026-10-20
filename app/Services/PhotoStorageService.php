@@ -57,7 +57,7 @@ class PhotoStorageService
         return null;
     }
 
-    public function store(UploadedFile $file, User $user, ?Album $album, ?string $altText = null): Photo
+    public function store(UploadedFile $file, User $user, ?Album $album, ?string $altText = null, bool $private = false): Photo
     {
         $error = $this->validateUpload($file);
         if ($error !== null) {
@@ -83,6 +83,7 @@ class PhotoStorageService
             'taken_at' => $this->readTakenAt($file->getPathname()),
             'size_bytes' => $file->getSize(),
             'mime_type' => $file->getMimeType(),
+            'is_private' => $private,
         ]);
         $photo->save();
 
@@ -105,7 +106,7 @@ class PhotoStorageService
      * @param  array<int, string>|string|null  $tags
      * @return array{uploaded: array<int, array{photo: Photo, key: string}>, failed: array<int, array{key: string, original_filename: string, error: string}>, duplicates: array<int, array{key: string, original_filename: string, error: string}>}
      */
-    public function storeMany(array $files, User $user, ?Album $album, array $altTexts, array $keys, array|string|null $tags): array
+    public function storeMany(array $files, User $user, ?Album $album, array $altTexts, array $keys, array|string|null $tags, bool $private = false): array
     {
         $uploaded = [];
         $failed = [];
@@ -142,6 +143,7 @@ class PhotoStorageService
 
             $existing = Photo::query()
                 ->where('user_id', $user->id)
+                ->where('is_private', $private)
                 ->where('file_hash', $hash)
                 ->first();
 
@@ -163,7 +165,7 @@ class PhotoStorageService
                     $altText = (string) $altTexts[$index];
                 }
 
-                $photo = $this->store($file, $user, $album, $altText);
+                $photo = $this->store($file, $user, $private ? null : $album, $altText, $private);
 
                 if ($normalizedTags !== []) {
                     $photo->tags = $normalizedTags;
@@ -195,8 +197,42 @@ class PhotoStorageService
      */
     public function filteredPhotos(User $user, array $filters, int $perPage): LengthAwarePaginator
     {
+        return $this->photosQuery($user, $filters)
+            ->orderByDesc('taken_at')
+            ->orderByDesc('id')
+            ->paginate(max(1, $perPage));
+    }
+
+    /**
+     * Photos the user owns that match the given filters and have an id greater
+     * than $afterId, ordered oldest-first so the front-end can prepend them in
+     * the order they were created. Powers the live grid refresher that keeps
+     * other devices in sync without a full page reload.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return Collection<int, Photo>
+     */
+    public function latestPhotos(User $user, array $filters, int $afterId, int $limit = 60): Collection
+    {
+        return $this->photosQuery($user, $filters)
+            ->where('photos.id', '>', $afterId)
+            ->orderBy('photos.id')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Base query for a user's photos with the shared search/album/tag/date
+     * filters applied. Archived photos are excluded unless the "archived" flag
+     * is set.
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    protected function photosQuery(User $user, array $filters)
+    {
         $query = $user->photos()
             ->with('albums')
+            ->where('is_private', false)
             ->when(! empty($filters['archived']), fn ($q) => $q->whereNotNull('archived_at'))
             ->when(empty($filters['archived']), fn ($q) => $q->whereNull('archived_at'));
 
@@ -231,10 +267,7 @@ class PhotoStorageService
             $query->whereDate('taken_at', '<=', $filters['to']);
         }
 
-        return $query
-            ->orderByDesc('taken_at')
-            ->orderByDesc('id')
-            ->paginate(max(1, $perPage));
+        return $query;
     }
 
     /**
@@ -245,6 +278,7 @@ class PhotoStorageService
     public function allTagsFor(User $user): array
     {
         return $user->photos()
+            ->where('is_private', false)
             ->pluck('tags')
             ->filter()
             ->flatten()
@@ -264,7 +298,7 @@ class PhotoStorageService
      */
     public function applyBulkUpdate(User $user, array $ids, ?string $altText, ?string $tags, ?int $albumId): array
     {
-        $photos = $user->photos()->whereIn('photos.id', $ids)->get();
+        $photos = $user->photos()->whereIn('photos.id', $ids)->where('is_private', false)->get();
 
         if ($photos->isEmpty()) {
             return ['count' => 0];

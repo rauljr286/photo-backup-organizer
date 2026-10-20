@@ -81,7 +81,7 @@ class WelcomePageTest extends TestCase
 
         $this->get('/register')
             ->assertOk()
-            ->assertSee('Before you create your account')
+            ->assertSee('Create your account')
             ->assertDontSee('id="landing-screen"', false);
     }
 }

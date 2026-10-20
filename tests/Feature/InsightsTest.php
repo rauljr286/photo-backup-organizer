@@ -41,9 +41,8 @@ class InsightsTest extends TestCase
             ->assertOk()
             ->assertSee('Photos')
             ->assertSee('Photos &amp; storage by year', false)
-            ->assertSee('Busiest months')
-            ->assertSee('Top tags')
-            ->assertSee('#beach');
+            ->assertDontSee('Busiest months')
+            ->assertDontSee('Top tags');
     }
 
     public function test_insights_page_renders_when_there_are_no_photos(): void

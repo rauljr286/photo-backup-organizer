@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Models\Photo;
 use App\Services\PhotoStorageService;
+use App\Support\PrivateGallery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -25,6 +27,7 @@ class PhotoController extends Controller
         $this->authorizePhoto($request, $photo);
 
         $siblings = $request->user()->photos()
+            ->when($photo->isPrivate(), fn ($query) => $query->where('is_private', true), fn ($query) => $query->where('is_private', false))
             ->when(! $photo->isArchived(), fn ($query) => $query->whereNull('archived_at'))
             ->orderByRaw('taken_at IS NULL, taken_at DESC, id DESC')
             ->pluck('id')
@@ -41,8 +44,8 @@ class PhotoController extends Controller
             'nextPhoto' => is_int($index) && isset($siblings[$index + 1])
                 ? Photo::find($siblings[$index + 1])
                 : null,
-            'albums' => $request->user()->albums()->orderBy('name')->get(),
-            'photoAlbums' => $photo->albums()->pluck('albums.id'),
+            'albums' => $photo->isPrivate() ? collect() : $request->user()->albums()->orderBy('name')->get(),
+            'photoAlbums' => $photo->isPrivate() ? collect() : $photo->albums()->pluck('albums.id'),
         ]);
     }
 
@@ -128,7 +131,7 @@ class PhotoController extends Controller
             ]);
         }
 
-        $photos = $request->user()->photos()->whereIn('photos.id', $ids)->get();
+        $photos = $request->user()->photos()->whereIn('photos.id', $ids)->where('is_private', false)->get();
 
         $zip = $this->photos->buildZip($photos, 'photos');
 
@@ -153,11 +156,17 @@ class PhotoController extends Controller
         $validated = $request->validate([
             'alt_text' => ['nullable', 'string', 'max:500'],
             'tags' => ['nullable', 'string', 'max:255'],
+            'original_filename' => ['nullable', 'string', 'max:255'],
         ]);
 
         $photo->alt_text = trim((string) ($validated['alt_text'] ?? '')) !== ''
             ? trim((string) $validated['alt_text'])
             : null;
+
+        if (array_key_exists('original_filename', $validated)) {
+            $filename = $this->sanitizeFilename((string) $validated['original_filename'], $photo);
+            $photo->original_filename = $filename !== '' ? $filename : $photo->original_filename;
+        }
 
         $photo->tags = collect(explode(',', (string) ($validated['tags'] ?? '')))
             ->map(fn ($tag) => trim($tag))
@@ -173,6 +182,7 @@ class PhotoController extends Controller
                 'message' => 'Photo details updated.',
                 'photo' => [
                     'alt_text' => $photo->alt_text,
+                    'original_filename' => $photo->original_filename,
                     'description' => $photo->description(),
                     'tags' => $photo->tags ?? [],
                 ],
@@ -284,5 +294,35 @@ class PhotoController extends Controller
         if ($photo->user_id !== $request->user()->id) {
             abort(403, 'You do not own this photo.');
         }
+
+        if ($photo->isPrivate() && ! PrivateGallery::isUnlocked($request)) {
+            abort(403, 'This photo is in your private gallery. Unlock it to view this photo.');
+        }
+    }
+
+    /**
+     * Tidy a user-supplied filename: drop any directory parts, remove characters
+     * that are unsafe on disk, keep the original extension, and cap the length.
+     */
+    protected function sanitizeFilename(string $name, Photo $photo): string
+    {
+        // Strip directory components and control/reserved characters.
+        $name = basename(str_replace('\\', '/', $name));
+        $name = preg_replace('/[\x00-\x1F\x7F<>:"|?*]/u', '', $name) ?? '';
+        $name = trim(preg_replace('/\s+/u', ' ', $name) ?? '');
+
+        // Work out the original extension so we can preserve it.
+        $extension = strtolower(pathinfo($photo->original_filename ?: basename($photo->file_path), PATHINFO_EXTENSION));
+        $base = pathinfo($name, PATHINFO_EXTENSION) !== '' ? pathinfo($name, PATHINFO_FILENAME) : $name;
+        $base = rtrim($base, ". \t");
+
+        // Never allow an empty or traversal-only name.
+        if ($base === '' || $base === '.' || $base === '..') {
+            return $photo->original_filename;
+        }
+
+        $base = Str::limit($base, 100, '');
+
+        return $extension !== '' ? "{$base}.{$extension}" : $base;
     }
 }

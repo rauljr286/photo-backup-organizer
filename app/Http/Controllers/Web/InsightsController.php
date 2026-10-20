@@ -10,37 +10,28 @@ use Illuminate\Support\Collection;
 class InsightsController extends Controller
 {
     /**
-     * Aggregate the user's library: storage by year, busiest months, top tags
-     * and the largest photos.
+     * Aggregate the user's library: storage by year, monthly uploads and the
+     * largest photos.
      */
     public function show(Request $request): View
     {
         $user = $request->user();
 
         $photos = $user->photos()
+            ->where('is_private', false)
             ->select(['id', 'original_filename', 'file_path', 'thumbnail_path', 'mime_type', 'taken_at', 'created_at', 'file_hash', 'size_bytes', 'archived_at', 'remote_path', 'tags'])
             ->get()
             ->sortByDesc('taken_at');
 
         $byYear = $photos
-            ->groupBy(fn ($photo) => $photo->taken_at?->year ?? $photo->created_at?->format('Y'))
+            ->groupBy(fn ($photo) => $photo->created_at?->format('Y'))
             ->map(fn (Collection $group) => [
                 'count' => $group->count(),
                 'bytes' => (int) $group->sum('size_bytes'),
             ])
             ->sortKeysDesc();
 
-        $busiestMonths = $photos
-            ->groupBy(fn ($photo) => ($photo->taken_at ?? $photo->created_at)?->format('F Y'))
-            ->map->count()
-            ->sortDesc()
-            ->take(5);
-
-        $topTags = collect($photos->pluck('tags')->flatten())
-            ->filter()
-            ->countBy()
-            ->sortDesc()
-            ->take(10);
+        $uploadsByMonth = $this->uploadsByMonth($photos);
 
         return view('insights', [
             'user' => $user,
@@ -52,10 +43,34 @@ class InsightsController extends Controller
                 'limitBytes' => $user->storageLimitBytes(),
             ],
             'byYear' => $byYear,
-            'busiestMonths' => $busiestMonths,
-            'topTags' => $topTags,
+            'uploadsByMonth' => $uploadsByMonth,
             'largest' => $photos->sortByDesc('size_bytes')->take(5)->values(),
         ]);
+    }
+
+    /**
+     * Upload counts for the trailing twelve months, oldest first.
+     *
+     * @return Collection<int, array{month: string, year: string, label: string, count: int}>
+     */
+    protected function uploadsByMonth(Collection $photos): Collection
+    {
+        $counts = $photos
+            ->groupBy(fn ($photo) => $photo->created_at?->format('Y-m'))
+            ->map->count();
+
+        return collect(range(11, 0))
+            ->map(function (int $monthsAgo) use ($counts) {
+                $month = now()->subMonthsNoOverflow($monthsAgo);
+
+                return [
+                    'month' => $month->format('M'),
+                    'year' => $month->format('y'),
+                    'label' => $month->format('M Y'),
+                    'count' => (int) ($counts[$month->format('Y-m')] ?? 0),
+                ];
+            })
+            ->values();
     }
 
     /**
@@ -68,7 +83,9 @@ class InsightsController extends Controller
 
         $photos = $user->photos()
             ->notArchived()
-            ->select(['id', 'original_filename', 'file_path', 'thumbnail_path', 'file_hash', 'size_bytes', 'taken_at', 'created_at'])
+            ->where('is_private', false)
+            ->select(['id', 'original_filename', 'file_path', 'thumbnail_path', 'file_hash', 'size_bytes', 'alt_text', 'taken_at', 'created_at'])
+            ->withCount('albums')
             ->get();
 
         $largest = $photos->sortByDesc('size_bytes')->take(10)->values();
@@ -85,11 +102,23 @@ class InsightsController extends Controller
             0,
         );
 
+        $notInAlbum = $photos
+            ->where('albums_count', 0)
+            ->sortByDesc('size_bytes')
+            ->values();
+
+        $missingDescription = $photos
+            ->filter(fn ($photo) => blank($photo->alt_text))
+            ->sortByDesc('size_bytes')
+            ->values();
+
         return view('cleanup', [
             'user' => $user,
             'largest' => $largest,
             'duplicates' => $duplicates,
             'duplicateCount' => $duplicateCount,
+            'notInAlbum' => $notInAlbum,
+            'missingDescription' => $missingDescription,
             'archivedCount' => $user->photos()->archived()->count(),
         ]);
     }

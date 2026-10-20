@@ -8,6 +8,7 @@ use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\InsightsController;
 use App\Http\Controllers\Web\LegalController;
 use App\Http\Controllers\Web\PhotoController;
+use App\Http\Controllers\Web\PrivateController;
 use App\Http\Controllers\Web\SocialAuthController;
 use Illuminate\Support\Facades\Route;
 
@@ -35,15 +36,29 @@ Route::middleware('auth')->group(function () {
     Route::post('/photos', [DashboardController::class, 'upload'])->name('photos.store');
     Route::post('/backup', [DashboardController::class, 'backupNow'])->name('backup.now');
     Route::get('/archive', [DashboardController::class, 'archive'])->name('archive');
+    Route::get('/photos/latest', [DashboardController::class, 'latest'])->name('photos.latest');
 
     Route::get('/insights', [InsightsController::class, 'show'])->name('insights');
     Route::get('/cleanup', [InsightsController::class, 'cleanup'])->name('cleanup');
 
+    Route::get('/private', [PrivateController::class, 'index'])->name('private');
+    Route::post('/private/password', [PrivateController::class, 'storePassword'])->name('private.password');
+    Route::post('/private/unlock', [PrivateController::class, 'unlock'])->name('private.unlock');
+    Route::post('/private/lock', [PrivateController::class, 'lock'])->name('private.lock');
+    Route::post('/private/reset', [PrivateController::class, 'resetPassword'])->name('private.reset');
+    Route::post('/private/photos', [PrivateController::class, 'upload'])->name('private.photos.store');
+
     Route::get('/settings', [DashboardController::class, 'settings'])->name('settings');
+    Route::get('/profile', [DashboardController::class, 'settings'])->name('profile');
+    Route::get('/profile/security', [DashboardController::class, 'settingsSecurity'])->name('profile.security');
+    Route::get('/profile/privacy', [DashboardController::class, 'settingsPrivacy'])->name('profile.privacy');
+    Route::get('/profile/private', [DashboardController::class, 'settingsPrivate'])->name('profile.private');
     Route::patch('/settings/name', [DashboardController::class, 'updateName'])->name('settings.name');
     Route::post('/settings/avatar', [DashboardController::class, 'updateAvatar'])->name('settings.avatar');
     Route::patch('/settings/password', [DashboardController::class, 'changePassword'])->name('settings.password');
-    Route::delete('/settings/account', [DashboardController::class, 'deleteAccount'])->name('settings.delete-account');
+    Route::post('/profile/logout-others', [DashboardController::class, 'logoutOtherSessions'])->name('profile.logout-others');
+    Route::post('/profile/deletion-request', [DashboardController::class, 'requestAccountDeletion'])->name('profile.deletion-request');
+    Route::delete('/profile/deletion-request', [DashboardController::class, 'cancelAccountDeletion'])->name('profile.deletion-request.cancel');
 
     Route::get('/avatar/{user}', [AvatarController::class, 'show'])->name('avatar');
 

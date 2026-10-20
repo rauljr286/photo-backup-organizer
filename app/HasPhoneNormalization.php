@@ -19,11 +19,11 @@ trait HasPhoneNormalization
 
         // Convert +639XXXXXXXXX to 639XXXXXXXXX or 09XXXXXXXXX to 09XXXXXXXXX
         if (str_starts_with($digits, '63') && strlen($digits) === 12) {
-            return '0' . substr($digits, 2);
+            return '0'.substr($digits, 2);
         }
 
         if (str_starts_with($digits, '9') && strlen($digits) === 10 && str_starts_with($phone, '+63')) {
-            return '0' . $digits;
+            return '0'.$digits;
         }
 
         return $phone;

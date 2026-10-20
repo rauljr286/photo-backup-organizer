@@ -18,6 +18,7 @@ class MigrateTrashedPhotosToArchived extends Command
 
         if ($count === 0) {
             $this->info('No trashed photos to migrate.');
+
             return self::SUCCESS;
         }
 
@@ -28,6 +29,7 @@ class MigrateTrashedPhotosToArchived extends Command
         }
 
         $this->info($count.' trashed photo(s) migrated to archived state.');
+
         return self::SUCCESS;
     }
 }

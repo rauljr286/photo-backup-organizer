@@ -129,10 +129,10 @@
 
             @if (! $agreed)
                 <section class="auth-legal">
-                    <h1 class="auth-card__heading" id="register-agreement-title">Before you create your account</h1>
+                    <h1 class="auth-card__heading" id="register-agreement-title">Create your account</h1>
                     <p class="auth-card__lead">
-                        A quick read-through of our Terms and Privacy Policy. Scroll to the end to unlock the
-                        <strong>I Agree</strong> button &mdash; it only takes a moment.
+                        Please review our Terms and Privacy Policy. Scroll to the end to unlock the
+                        <strong>I Agree</strong> button.
                     </p>
 
                     <div class="auth-legal__progress" role="progressbar" aria-label="Terms reading progress"

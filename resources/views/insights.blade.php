@@ -61,6 +61,42 @@
             </div>
         </div>
 
+        @php
+            $peakUploads = max(1, $uploadsByMonth->max('count'));
+        @endphp
+
+        <div class="insights-grid">
+            <section class="panel" aria-labelledby="uploads-heading">
+                <h2 class="panel__heading" id="uploads-heading">Uploads, last 12 months</h2>
+                <p class="panel__subheading">How many photos you added each month, newest on the right.</p>
+
+                @if ($summary['total'] === 0)
+                    <p class="empty-note">No photos uploaded yet.</p>
+                @else
+                    <div class="bar-chart-wrap">
+                        <ul class="bar-chart">
+                            @foreach ($uploadsByMonth as $slot)
+                                @php
+                                    $height = $slot['count'] > 0
+                                        ? max(6, (int) round($slot['count'] / $peakUploads * 100))
+                                        : 0;
+                                @endphp
+                                <li class="bar-chart__col">
+                                    <span class="bar-chart__value @if ($slot['count'] === 0) is-empty @endif">{{ $slot['count'] }}</span>
+                                    <span class="bar-chart__bar" style="height: {{ $height }}%" role="img"
+                                          aria-label="{{ $slot['label'] }}: {{ $slot['count'] }} photo{{ $slot['count'] === 1 ? '' : 's' }}"></span>
+                                    <span class="bar-chart__label">
+                                        <span class="bar-chart__month">{{ $slot['month'] }}</span>
+                                        <span class="bar-chart__year">{{ $slot['year'] }}</span>
+                                    </span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+            </section>
+        </div>
+
         <section class="panel" aria-labelledby="by-year-heading">
             <h2 class="panel__heading" id="by-year-heading">Photos &amp; storage by year</h2>
 
@@ -87,42 +123,6 @@
                 </table>
             @endif
         </section>
-
-        <div class="insights-grid">
-            <section class="panel" aria-labelledby="busy-heading">
-                <h2 class="panel__heading" id="busy-heading">Busiest months</h2>
-
-                @if ($busiestMonths->isEmpty())
-                    <p class="empty-note">Not enough data yet.</p>
-                @else
-                    <ol class="insight-list">
-                        @foreach ($busiestMonths as $month => $count)
-                            <li class="insight-list__row">
-                                <span>{{ $month }}</span>
-                                <span class="insight-list__value">{{ $count }} photo{{ $count === 1 ? '' : 's' }}</span>
-                            </li>
-                        @endforeach
-                    </ol>
-                @endif
-            </section>
-
-            <section class="panel" aria-labelledby="tags-heading">
-                <h2 class="panel__heading" id="tags-heading">Top tags</h2>
-
-                @if ($topTags->isEmpty())
-                    <p class="empty-note">No tags yet - add tags to photos to see them here.</p>
-                @else
-                    <ol class="insight-list">
-                        @foreach ($topTags as $tag => $count)
-                            <li class="insight-list__row">
-                                <span>#{{ $tag }}</span>
-                                <span class="insight-list__value">{{ $count }}</span>
-                            </li>
-                        @endforeach
-                    </ol>
-                @endif
-            </section>
-        </div>
 
         <section class="panel" aria-labelledby="largest-heading">
             <h2 class="panel__heading" id="largest-heading">Largest photos</h2>

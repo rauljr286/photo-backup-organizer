@@ -9,7 +9,7 @@
             <li>Photos are stored securely and encrypted in transit and at rest.</li>
             <li>We do not sell or use your photos for advertising or AI training purposes.</li>
             <li>You may delete your account and all associated photos at any time from
-                <a class="link" href="{{ route('settings', ['tab' => 'privacy']) }}">Settings</a>.</li>
+                <a class="link" href="{{ route('profile.privacy') }}">Settings</a>.</li>
             <li>
                 Archived photos are kept until you choose to restore them. There is no automatic
                 deletion of your photos.

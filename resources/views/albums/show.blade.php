@@ -7,7 +7,10 @@
                 </svg>
             </span>
             <div class="section-head__text">
-                <a class="link section-head__back" href="{{ route('albums.index') }}">&larr; All albums</a>
+                <a class="link section-head__back" href="{{ route('albums.index') }}">
+                    <span class="section-head__back-icon" aria-hidden="true">&larr;</span>
+                    All albums
+                </a>
                 <h1 class="section-head__title">{{ $album->name }}</h1>
                 <p class="section-head__subtitle">{{ $photos->total() }} photo(s) in this album &middot; created {{ $album->created_at?->format('M j, Y') }}</p>
             </div>
@@ -17,7 +20,7 @@
             </div>
         </div>
 
-        <x-upload-dropzone :album-id="$album->id"></x-upload-dropzone>
+
 
         <section class="filter-bar" aria-labelledby="filter-heading">
             <h2 class="visually-hidden" id="filter-heading">Filter photos in this album</h2>

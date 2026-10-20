@@ -400,26 +400,198 @@ function createUploadItem(file, list, { nextKey, onRetry }) {
     return entry;
 }
 
-/* When photos are uploaded we rebuild the grid from the latest server data. */
+/* When photos are uploaded we add the latest server data to the grid. */
 function refreshGrid(uploaded) {
-    const grid = document.getElementById('photo-grid');
-    const emptyState = document.querySelector('.empty-state');
-    const counter = document.querySelector('.photo-section__count');
-    if (grid) grid.insertAdjacentHTML('afterbegin', uploaded.map((photo) => photoCardHtml(photo)).join(''));
-    if (emptyState) emptyState.remove();
-    if (counter) counter.textContent = `${Number((counter.textContent.match(/\d+/) || [0])[0]) + uploaded.length} photo(s)`;
+    prependPhotos(uploaded);
+}
+
+/* Prepend photos to the grid, skipping any already on screen. Creates the grid
+ * container on the fly when the library was previously empty, so uploads from
+ * any device show up without a full page reload. */
+function prependPhotos(photos) {
+    if (!photos || !photos.length) return 0;
+
+    const grid = ensureGrid();
+    if (!grid) return 0;
+
+    const known = new Set();
+    grid.querySelectorAll('.photo-card[data-photo-id]').forEach((card) => {
+        known.add(Number(card.dataset.photoId));
+    });
+
+    const fresh = photos.filter((photo) => photo && !known.has(Number(photo.id)));
+    if (!fresh.length) return 0;
+
+    grid.insertAdjacentHTML('afterbegin', fresh.map(photoCardHtml).join(''));
+
+    document.querySelector('.empty-state')?.remove();
+    bumpPhotoCount(fresh.length);
+    advanceLatestId();
+
+    return fresh.length;
+}
+
+/* Ensure the dashboard has a photo grid, building the standard count + grid
+ * markup when the empty state is currently shown. */
+function ensureGrid() {
+    let grid = document.getElementById('photo-grid');
+    if (grid) return grid;
+
+    const section = document.getElementById('photo-section');
+    if (!section) return null;
+
+    section.querySelector('.empty-state')?.remove();
+
+    grid = document.createElement('div');
+    grid.className = 'photo-grid';
+    grid.id = 'photo-grid';
+
+    section.append(grid);
+
+    return grid;
+}
+
+function photoCountLabel(count) {
+    return `${count.toLocaleString()} ${count === 1 ? 'photo' : 'photos'}`;
+}
+
+function bumpPhotoCount(added) {
+    const counter = document.querySelector('.section-head__subtitle');
+    if (!counter) return;
+    const current = Number((counter.textContent.replace(/,/g, '').match(/\d+/) || [0])[0]) || 0;
+    counter.textContent = photoCountLabel(current + added);
+}
+
+function advanceLatestId() {
+    const section = document.getElementById('photo-section');
+    if (!section) return;
+
+    let max = Number(section.dataset.latestId || 0);
+    document.querySelectorAll('#photo-grid .photo-card[data-photo-id]').forEach((card) => {
+        const id = Number(card.dataset.photoId);
+        if (id > max) max = id;
+    });
+
+    section.dataset.latestId = String(max);
 }
 
 function photoCardHtml(photo) {
+    const description = escapeHtml(photo.description || 'Photo');
+    const date = formatCardDate(photo.taken_at);
+    const size = photo.size_bytes != null
+        ? `<span class="photo-card__size">${Math.round(Number(photo.size_bytes) / 1024)} KB</span>`
+        : '';
+    const flag = photo.backed_up === false
+        ? '<span class="photo-card__flag" title="Not backed up to cloud yet">Cloud backup pending</span>'
+        : '';
+
     return `
     <figure class="photo-card" data-photo-id="${photo.id}" data-archive-url="/photos/${photo.id}" data-restore-url="/photos/${photo.id}/unarchive">
-      <a class="photo-card__media" href="/photos/${photo.id}">
-        <img class="photo-card__img" src="${photo.thumbnail_url || photo.url}" alt="${escapeHtml(photo.description)}" loading="lazy">
+      <a class="photo-card__media" href="/photos/${photo.id}" aria-label="Open ${description}">
+        <img class="photo-card__img" src="${photo.thumbnail_url || photo.url}" alt="${description}" loading="lazy">
+        ${flag}
       </a>
       <figcaption class="photo-card__caption">
-        <span class="photo-card__date">Uploaded just now</span>
+        <span class="photo-card__date">${date}</span>
+        ${size}
       </figcaption>
+      <div class="photo-card__actions">
+        <label class="field__check photo-card__check">
+          <input class="field__checkbox js-select-photo" type="checkbox" name="selected[]" value="${photo.id}" aria-label="Select ${description}">
+        </label>
+      </div>
     </figure>`;
+}
+
+function formatCardDate(value) {
+    if (!value) return 'Taken date unknown';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Taken date unknown';
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/* Poll for photos uploaded elsewhere and slip them into the grid live. */
+function initLiveGrid() {
+    const section = document.getElementById('photo-section');
+    if (!section || !section.dataset.latestUrl) return;
+
+    const interval = 7000;
+    let timer = null;
+    let inFlight = false;
+    let failures = 0;
+
+    const queryString = (after) => {
+        const params = new URLSearchParams();
+        const form = document.getElementById('filter-form');
+
+        if (form) {
+            new FormData(form).forEach((value, key) => {
+                if (String(value).trim() === '') return;
+                params.set(key, String(value));
+            });
+        }
+
+        params.set('after', String(after));
+        return params.toString();
+    };
+
+    const stop = () => {
+        if (timer !== null) {
+            window.clearInterval(timer);
+            timer = null;
+        }
+    };
+
+    const poll = () => {
+        if (inFlight || document.hidden) return;
+        inFlight = true;
+
+        const after = Number(section.dataset.latestId || 0);
+        const url = `${section.dataset.latestUrl}?${queryString(after)}`;
+
+        fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+            .then((response) => {
+                if (response.status === 401 || response.status === 419) {
+                    stop();
+                    return null;
+                }
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                return response.json();
+            })
+            .then((data) => {
+                if (!data) return;
+                failures = 0;
+                const photos = data.photos || [];
+                if (photos.length) {
+                    prependPhotos(photos);
+                    advanceLatestId();
+                }
+            })
+            .catch(() => {
+                failures++;
+                if (failures >= 5) stop();
+            })
+            .finally(() => {
+                inFlight = false;
+            });
+    };
+
+    const start = () => {
+        if (timer === null && !document.hidden) {
+            timer = window.setInterval(poll, interval);
+        }
+    };
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stop();
+        } else {
+            poll();
+            start();
+        }
+    });
+
+    start();
 }
 
 function escapeHtml(value) {
@@ -433,13 +605,13 @@ function escapeHtml(value) {
 function initBulkSelect() {
     const bar = document.getElementById('bulk-bar');
     const count = document.getElementById('bulk-count');
-    const grid = document.getElementById('photo-grid');
+    const getGrid = () => document.getElementById('photo-grid');
     if (!bar || !count) return;
 
     let hideTimer = null;
 
     const update = () => {
-        const boxes = grid ? grid.querySelectorAll('.js-select-photo:checked') : [];
+        const boxes = getGrid() ? getGrid().querySelectorAll('.js-select-photo:checked') : [];
         const n = boxes.length;
         count.textContent = n;
         window.clearTimeout(hideTimer);
@@ -458,7 +630,7 @@ function initBulkSelect() {
     };
 
     const clear = () => {
-        grid?.querySelectorAll('.js-select-photo').forEach((box) => { box.checked = false; });
+        getGrid()?.querySelectorAll('.js-select-photo').forEach((box) => { box.checked = false; });
         update();
     };
 
@@ -469,7 +641,7 @@ function initBulkSelect() {
     document.getElementById('clear-selected')?.addEventListener('click', clear);
 
     document.getElementById('archive-selected')?.addEventListener('click', () => {
-        const boxes = grid ? Array.from(grid.querySelectorAll('.js-select-photo:checked')) : [];
+        const boxes = Array.from(getGrid()?.querySelectorAll('.js-select-photo:checked') || []);
         if (!boxes.length) return;
 
         const dialog = document.getElementById('bulk-archive-dialog');
@@ -507,7 +679,7 @@ function initBulkSelect() {
     });
 
     document.getElementById('edit-selected')?.addEventListener('click', () => {
-        const boxes = grid ? Array.from(grid.querySelectorAll('.js-select-photo:checked')) : [];
+        const boxes = Array.from(getGrid()?.querySelectorAll('.js-select-photo:checked') || []);
         if (!boxes.length) return;
 
         const dialog = document.getElementById('bulk-edit-dialog');
@@ -595,6 +767,37 @@ function initDialogs() {
     });
 }
 
+/* ---------------- Private gallery gate ---------------- */
+
+// When the private gallery is locked, clicking any link to it opens a password
+// prompt (the gate dialog) instead of navigating to the locked page. The dialog
+// is only rendered while locked, so unlocked users and users who have not set a
+// private password yet simply follow the link.
+function initPrivateGate() {
+    const dialog = document.getElementById('private-gate-dialog');
+    if (!dialog) return;
+
+    let lastTrigger = null;
+
+    document.querySelectorAll('[data-private-gate]').forEach((link) => {
+        link.addEventListener('click', (e) => {
+            e.preventDefault();
+            lastTrigger = link;
+            if (typeof dialog.showModal === 'function') {
+                dialog.showModal();
+            } else {
+                dialog.setAttribute('open', '');
+            }
+            dialog.querySelector('[data-private-gate-focus]')?.focus();
+        });
+    });
+
+    dialog.addEventListener('close', () => {
+        lastTrigger?.focus();
+        lastTrigger = null;
+    });
+}
+
 /* ---------------- Photo zoom ---------------- */
 
 function initZoom() {
@@ -602,40 +805,95 @@ function initZoom() {
     const level = document.getElementById('zoom-level');
     if (!img || !level) return;
 
+    const stage = document.getElementById('zoom-stage');
     const max = 4;
+    const min = 0.25;
+    const step = 0.25;
     let scale = 1;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    const clamp = (value) => Math.round(Math.min(Math.max(value, min), max) * 100) / 100;
 
     const apply = () => {
-        img.style.transform = `scale(${scale})`;
+        img.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
+        img.style.cursor = scale > 1 ? 'grab' : 'default';
         level.textContent = `${Math.round(scale * 100)}%`;
         level.setAttribute('aria-label', `Zoom level ${Math.round(scale * 100)} percent`);
     };
 
+    const resetPan = () => {
+        offsetX = 0;
+        offsetY = 0;
+    };
+
     document.getElementById('zoom-in')?.addEventListener('click', () => {
-        scale = Math.min(scale + 0.5, max);
+        scale = clamp(scale + step);
         apply();
     });
     document.getElementById('zoom-out')?.addEventListener('click', () => {
-        scale = Math.max(scale - 0.5, 1);
+        scale = clamp(scale - step);
+        if (scale <= 1) resetPan();
         apply();
     });
     document.getElementById('zoom-reset')?.addEventListener('click', () => {
         scale = 1;
+        resetPan();
         apply();
     });
+
+    // Drag to pan while zoomed in.
+    if (stage) {
+        let dragging = false;
+        let startX = 0;
+        let startY = 0;
+        let baseX = 0;
+        let baseY = 0;
+
+        stage.addEventListener('pointerdown', (e) => {
+            if (scale <= 1) return;
+            dragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            baseX = offsetX;
+            baseY = offsetY;
+            img.style.cursor = 'grabbing';
+            stage.setPointerCapture?.(e.pointerId);
+        });
+
+        stage.addEventListener('pointermove', (e) => {
+            if (!dragging) return;
+            offsetX = baseX + (e.clientX - startX);
+            offsetY = baseY + (e.clientY - startY);
+            apply();
+        });
+
+        const stop = (e) => {
+            if (!dragging) return;
+            dragging = false;
+            img.style.cursor = scale > 1 ? 'grab' : 'default';
+            stage.releasePointerCapture?.(e.pointerId);
+        };
+
+        stage.addEventListener('pointerup', stop);
+        stage.addEventListener('pointercancel', stop);
+        stage.addEventListener('pointerleave', stop);
+    }
 
     document.addEventListener('keydown', (e) => {
         if (e.target.closest('input, textarea, select')) return;
         if (e.key === '+' || e.key === '=') {
             e.preventDefault();
-            scale = Math.min(scale + 0.5, max);
+            scale = clamp(scale + step);
             apply();
         } else if (e.key === '-') {
             e.preventDefault();
-            scale = Math.max(scale - 0.5, 1);
+            scale = clamp(scale - step);
+            if (scale <= 1) resetPan();
             apply();
 } else if (e.key === '0') {
             scale = 1;
+            resetPan();
             apply();
         } else if (e.key === 'ArrowLeft') {
             const prev = document.querySelector('.viewer__nav--prev');
@@ -675,6 +933,51 @@ function initFilters() {
     if (search) {
         search.addEventListener('search', () => form.submit());
     }
+}
+
+/* ---------------- Tab bars ---------------- */
+
+function initTabBars() {
+    document.querySelectorAll('[data-tabs]').forEach((group) => {
+        const buttons = Array.from(group.querySelectorAll('[data-tab]'));
+        if (!buttons.length) return;
+
+        const panelFor = (button) => document.getElementById(button.getAttribute('aria-controls'));
+
+        const activate = (key) => {
+            buttons.forEach((button) => {
+                const on = button.dataset.tab === key;
+                button.classList.toggle('is-active', on);
+                button.setAttribute('aria-selected', on ? 'true' : 'false');
+                button.tabIndex = on ? 0 : -1;
+                const panel = panelFor(button);
+                if (panel) panel.hidden = !on;
+            });
+        };
+
+        const current = buttons.find((button) => button.getAttribute('aria-selected') === 'true') || buttons[0];
+
+        buttons.forEach((button) => {
+            button.addEventListener('click', () => activate(button.dataset.tab));
+            button.addEventListener('keydown', (event) => {
+                const index = buttons.indexOf(button);
+                let next = null;
+
+                if (event.key === 'ArrowRight' || event.key === 'ArrowDown') next = buttons[(index + 1) % buttons.length];
+                if (event.key === 'ArrowLeft' || event.key === 'ArrowUp') next = buttons[(index - 1 + buttons.length) % buttons.length];
+                if (event.key === 'Home') next = buttons[0];
+                if (event.key === 'End') next = buttons[buttons.length - 1];
+
+                if (next) {
+                    event.preventDefault();
+                    activate(next.dataset.tab);
+                    next.focus();
+                }
+            });
+        });
+
+        activate(current.dataset.tab);
+    });
 }
 
 /* ---------------- Password visibility toggles ---------------- */
@@ -782,38 +1085,71 @@ function initSidebar() {
 /* ---------------- Topbar user menu ---------------- */
 
 function initUserMenu() {
-    const menu = document.querySelector('[data-user-menu]');
-    if (!menu) return;
+    const menus = document.querySelectorAll('[data-user-menu]');
+    if (!menus.length) return;
 
-    const trigger = menu.querySelector('[data-user-menu-trigger]');
-    const panel = menu.querySelector('[data-user-menu-panel]');
-    if (!trigger || !panel) return;
+    const setOpen = (menu, open) => {
+        const trigger = menu.querySelector('[data-user-menu-trigger]');
+        const panel = menu.querySelector('[data-user-menu-panel]');
+        if (!trigger || !panel) return;
 
-    const isOpen = () => menu.classList.contains('is-open');
-    const setOpen = (open) => {
         menu.classList.toggle('is-open', open);
         trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
         panel.hidden = !open;
     };
 
-    trigger.addEventListener('click', () => setOpen(!isOpen()));
+    const closeAll = (except) => {
+        menus.forEach((menu) => {
+            if (menu !== except && menu.classList.contains('is-open')) setOpen(menu, false);
+        });
+    };
+
+    menus.forEach((menu) => {
+        const trigger = menu.querySelector('[data-user-menu-trigger]');
+        const panel = menu.querySelector('[data-user-menu-panel]');
+        if (!trigger || !panel) return;
+
+        const isOpen = () => menu.classList.contains('is-open');
+
+        trigger.addEventListener('click', () => {
+            const next = !isOpen();
+            closeAll(menu);
+            setOpen(menu, next);
+        });
+
+        // Following a link dismisses the menu; the theme toggle and the
+        // sign-out button intentionally keep it open.
+        panel.addEventListener('click', (e) => {
+            if (e.target.closest('a')) setOpen(menu, false);
+        });
+    });
 
     document.addEventListener('click', (e) => {
-        if (isOpen() && !menu.contains(e.target)) setOpen(false);
+        menus.forEach((menu) => {
+            if (menu.classList.contains('is-open') && !menu.contains(e.target)) setOpen(menu, false);
+        });
     });
 
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && isOpen()) {
-            setOpen(false);
-            trigger.focus();
-        }
+        if (e.key !== 'Escape') return;
+        menus.forEach((menu) => {
+            if (!menu.classList.contains('is-open')) return;
+            setOpen(menu, false);
+            menu.querySelector('[data-user-menu-trigger]')?.focus();
+        });
     });
 
-    // Following a link (e.g. settings) dismisses the menu; the theme toggle
-    // and the sign-out button intentionally keep it open.
-    panel.addEventListener('click', (e) => {
-        if (e.target.closest('a')) setOpen(false);
-    });
+    // Crossing the breakpoint that swaps the header dropdown for the mobile
+    // "More" menu (rotation, switching to "Desktop site") must not leave a
+    // stale menu open. Uses the same (min-width: 900px) query as the CSS.
+    const desktopQuery = window.matchMedia('(min-width: 900px)');
+    const onBreakpointChange = () => closeAll();
+
+    if (typeof desktopQuery.addEventListener === 'function') {
+        desktopQuery.addEventListener('change', onBreakpointChange);
+    } else if (typeof desktopQuery.addListener === 'function') {
+        desktopQuery.addListener(onBreakpointChange);
+    }
 }
 
 /* ---------------- Avatar upload ---------------- */
@@ -826,20 +1162,53 @@ function initAvatar() {
     const form = document.getElementById('avatar-form');
     if (!input || !form) return;
 
+    const error = document.querySelector('[data-avatar-error]');
+
+    const showError = (message) => {
+        if (error) {
+            error.textContent = message;
+            error.hidden = false;
+        } else {
+            showToast(message, { tone: 'error' });
+        }
+    };
+
+    const clearError = () => {
+        if (error) {
+            error.textContent = '';
+            error.hidden = true;
+        }
+    };
+
     input.addEventListener('change', () => {
         const file = input.files?.[0];
         if (!file) return;
 
+        clearError();
+
         if (!AVATAR_TYPES.has(file.type)) {
-            showToast('Please choose a JPG, PNG, or WebP image.', { tone: 'error' });
+            showError('Please choose a JPG, PNG, or WebP image.');
             input.value = '';
             return;
         }
 
         if (file.size > AVATAR_MAX_BYTES) {
-            showToast('The image must be 5MB or smaller.', { tone: 'error' });
+            showError('The image must be 5MB or smaller.');
             input.value = '';
             return;
+        }
+
+        const avatar = document.querySelector('.profile__avatar .avatar');
+        if (avatar) {
+            let img = avatar.querySelector('.avatar__img');
+            if (!img) {
+                avatar.querySelector('.avatar__placeholder')?.remove();
+                img = document.createElement('img');
+                img.className = 'avatar__img';
+                img.alt = '';
+                avatar.appendChild(img);
+            }
+            img.src = URL.createObjectURL(file);
         }
 
         form.submit();
@@ -1076,7 +1445,7 @@ function initDownloadSelected() {
 
     button.addEventListener('click', () => {
         const grid = document.getElementById('photo-grid');
-        const boxes = grid ? Array.from(grid.querySelectorAll('.js-select-photo:checked')) : [];
+        const boxes = Array.from(getGrid()?.querySelectorAll('.js-select-photo:checked') || []);
 
         if (!boxes.length) {
             showToast('Select at least one photo to download.', { tone: 'warning' });
@@ -1438,8 +1807,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initUploads();
     initBulkSelect();
     initDialogs();
+    initPrivateGate();
     initZoom();
     initFilters();
+    initTabBars();
     initPasswordToggles();
     initSidebar();
     initUserMenu();
@@ -1449,6 +1820,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initFlashToasts();
     initEmptyStates();
     initImageSkeletons();
+    initLiveGrid();
     initLoadingButtons();
     initStorageWarning();
     initDownloadSelected();

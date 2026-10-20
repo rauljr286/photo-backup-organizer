@@ -91,7 +91,7 @@ class AuthTest extends TestCase
     {
         $this->get(route('register'))
             ->assertOk()
-            ->assertSee('Before you create your account')
+            ->assertSee('Create your account')
             ->assertSee('I Agree')
             ->assertSee('data-terms-scroll');
     }

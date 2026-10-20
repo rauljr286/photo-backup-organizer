@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\HandlesPhotoUploads;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePhotoRequest;
 use App\Services\PhotoStorageService;
+use App\Support\PrivateGallery;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -52,11 +53,12 @@ class DashboardController extends Controller
                 ->map(fn ($t) => trim($t))
                 ->filter()
                 ->values(),
-            'usedBytes' => $user->storageUsedBytes(),
+            'usedBytes' => $user->libraryStorageUsedBytes(),
             'limitBytes' => $user->storageLimitBytes(),
-            'usedPercent' => $user->storageUsedPercent(),
-            'archivedCount' => $user->photos()->archived()->count(),
-            'unbackedUpCount' => $user->photos()->whereNull('remote_path')->count(),
+            'usedPercent' => $user->libraryStorageUsedPercent(),
+            'activeCount' => $user->photos()->notPrivate()->whereNull('archived_at')->count(),
+            'archivedCount' => $user->photos()->notPrivate()->archived()->count(),
+            'unbackedUpCount' => $user->photos()->notPrivate()->whereNull('remote_path')->count(),
             'request' => $request,
         ]);
     }
@@ -70,7 +72,42 @@ class DashboardController extends Controller
 
         return view('photos.archive', [
             'user' => $user,
-            'photos' => $user->photos()->archived()->orderByDesc('archived_at')->paginate(24),
+            'photos' => $user->photos()->notPrivate()->archived()->orderByDesc('archived_at')->paginate(24),
+        ]);
+    }
+
+    /**
+     * Return photos newer than the given id that match the current filters.
+     * The dashboard polls this so photos uploaded from another device appear
+     * on screen without a manual refresh.
+     */
+    public function latest(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'album' => ['nullable', 'integer'],
+            'tags' => ['nullable', 'string', 'max:255'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+            'after' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        $afterId = (int) ($filters['after'] ?? 0);
+        $photos = $this->photos->latestPhotos($user, $filters, $afterId);
+
+        return response()->json([
+            'photos' => $photos->map(fn ($photo) => [
+                'id' => $photo->id,
+                'url' => $photo->url(),
+                'thumbnail_url' => $photo->thumbnailUrl(),
+                'description' => $photo->description(),
+                'size_bytes' => $photo->size_bytes,
+                'taken_at' => $photo->taken_at?->toISOString(),
+                'backed_up' => $photo->isBackedUp(),
+            ])->values(),
+            'latest_id' => $photos->max('id') ?? $afterId,
         ]);
     }
 
@@ -122,17 +159,59 @@ class DashboardController extends Controller
      */
     public function settings(Request $request): View
     {
+        return $this->renderSettings($request, 'profile');
+    }
+
+    /**
+     * Preferences & security tab.
+     */
+    public function settingsSecurity(Request $request): View
+    {
+        return $this->renderSettings($request, 'security');
+    }
+
+    /**
+     * Privacy & data tab.
+     */
+    public function settingsPrivacy(Request $request): View
+    {
+        return $this->renderSettings($request, 'privacy');
+    }
+
+    /**
+     * Private gallery tab.
+     */
+    public function settingsPrivate(Request $request): View
+    {
+        return $this->renderSettings($request, 'private');
+    }
+
+    /**
+     * Build the account area with the requested tab highlighted.
+     */
+    protected function renderSettings(Request $request, string $fallbackTab): View
+    {
         $user = $request->user();
+        $tab = $request->query('tab', $fallbackTab);
+
+        if (! in_array($tab, ['profile', 'security', 'privacy', 'private'], true)) {
+            $tab = $fallbackTab;
+        }
 
         return view('settings', [
             'user' => $user,
-            'activeTab' => $request->query('tab', 'profile'),
+            'activeTab' => $tab,
             'supportEmail' => config('photobackup.support_email', 'support@example.com'),
-            'photoCount' => $user->photos()->count(),
+            'photoCount' => $user->photos()->notPrivate()->count(),
+            'activeCount' => $user->photos()->notPrivate()->whereNull('archived_at')->count(),
+            'archivedCount' => $user->photos()->notPrivate()->archived()->count(),
             'albumCount' => $user->albums()->count(),
-            'usedBytes' => $user->storageUsedBytes(),
+            'usedBytes' => $user->libraryStorageUsedBytes(),
             'limitBytes' => $user->storageLimitBytes(),
-            'usedPercent' => $user->storageUsedPercent(),
+            'usedPercent' => $user->libraryStorageUsedPercent(),
+            'privateConfigured' => $user->hasPrivatePassword(),
+            'privateUnlocked' => PrivateGallery::isUnlocked($request),
+            'privatePhotoCount' => $user->privatePhotos()->count(),
         ]);
     }
 
@@ -268,37 +347,55 @@ class DashboardController extends Controller
     }
 
     /**
-     * Permanently delete the account and all associated photos.
+     * File an account-deletion request. Nothing is deleted here: the request is
+     * recorded for manual review and the user keeps full access until then.
      */
-    public function deleteAccount(Request $request): RedirectResponse
+    public function requestAccountDeletion(Request $request): RedirectResponse
     {
         $request->validate([
-            'email' => ['required', 'string', 'email'],
+            'confirm' => ['accepted'],
         ], [
-            'email.required' => 'Please type your email address to confirm.',
-            'email.email' => 'Please type a valid email address.',
+            'confirm.accepted' => 'Please confirm you understand the request is reviewed manually.',
+        ]);
+
+        $user = $request->user();
+        $user->requestDeletion();
+
+        return back()->with('status', 'Your account deletion request has been received. Nothing has been deleted yet — our team will review it and contact you by email.');
+    }
+
+    /**
+     * Withdraw an open account-deletion request.
+     */
+    public function cancelAccountDeletion(Request $request): RedirectResponse
+    {
+        $request->user()->cancelDeletion();
+
+        return back()->with('status', 'Your account deletion request has been cancelled.');
+    }
+
+    /**
+     * Sign the user out of every other device by re-hashing the password so
+     * any other session's authentication is invalidated.
+     */
+    public function logoutOtherSessions(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'current_password' => ['required', 'string'],
+        ], [
+            'current_password.required' => 'Please enter your current password.',
         ]);
 
         $user = $request->user();
 
-        if (strtolower($user->email) !== strtolower(trim($request->email))) {
+        if (! Hash::check($request->current_password, $user->password)) {
             throw ValidationException::withMessages([
-                'email' => 'The email you typed does not match your account.',
+                'current_password' => 'Your current password is incorrect.',
             ]);
         }
 
-        $photos = $user->photos()->withTrashed()->get();
-        foreach ($photos as $photo) {
-            $this->photos->purge($photo);
-        }
+        Auth::logoutOtherDevices($request->current_password);
 
-        $user->albums()->delete();
-        $user->tokens()->delete();
-
-        Auth::logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return redirect()->route('login')->with('status', 'Your account and all of your photos have been permanently deleted.');
+        return back()->with('status', 'You have been signed out of your other devices.');
     }
 }

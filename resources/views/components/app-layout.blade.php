@@ -9,20 +9,30 @@
     <title>{{ $title ?? 'Photo Backup Organizer' }} - Photo Backup</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body>
+<body class="{{ $bodyClass ?? '' }}">
     <a class="skip-link" href="#main-content">Skip to main content</a>
 
     <div class="app-shell">
         <header class="topbar">
             <div class="topbar__inner">
+                <a href="{{ route('dashboard') }}" class="topbar__brand brand" aria-label="Photo Backup Organizer home">
+                    <svg class="brand__icon" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path vector-effect="non-scaling-stroke" transform="translate(12 5) scale(0.5) translate(-12 -11)" d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
+                        <path d="M5 11.5h3.6l1.2-2h4.4l1.2 2H19a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V13.5a2 2 0 0 1 2-2Z"/>
+                        <circle cx="12" cy="15.5" r="2.5"/>
+                    </svg>
+                    <span>Photo Backup Organizer</span>
+                </a>
+
                 <div class="topbar__nav">
                     <x-nav-tabs></x-nav-tabs>
                 </div>
 
+                @php($account = config('navigation.account'))
                 <div class="topbar__account">
                     <div class="user-menu" data-user-menu>
                         <button type="button" class="topbar__user user-menu__trigger" data-user-menu-trigger
-                                aria-haspopup="true" aria-expanded="false" aria-controls="user-menu-panel">
+                                aria-haspopup="true" aria-expanded="false" aria-controls="user-menu-panel" aria-label="Account menu">
                             <span class="avatar avatar--sm" role="img" aria-label="Signed in as {{ auth()->user()->name }}">
                                 <span class="avatar__initials" aria-hidden="true">{{ auth()->user()->initials() }}</span>
                             </span>
@@ -31,7 +41,7 @@
                             </svg>
                         </button>
 
-                        <div class="user-menu__panel" id="user-menu-panel" data-user-menu-panel hidden>
+                        <div class="user-menu__panel" id="user-menu-panel" data-user-menu-panel role="menu" aria-label="Account" hidden>
                             <p class="user-menu__header">
                                 <span class="user-menu__name">{{ auth()->user()->name }}</span>
                                 @if (auth()->user()->email)
@@ -39,63 +49,21 @@
                                 @endif
                             </p>
 
-                            <a class="user-menu__item" href="{{ route('settings') }}">
-                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="12" cy="7" r="4"></circle>
-                                </svg>
-                                <span>Profile &amp; settings</span>
+                            <a class="user-menu__item" href="{{ route($account['profile']['route']) }}" role="menuitem">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">{!! $account['profile']['icon'] !!}</svg>
+                                <span>{{ $account['profile']['label'] }}</span>
                             </a>
 
-                            <x-theme-toggle class="user-menu__item" label="Light mode" />
+                            <x-theme-toggle class="user-menu__item" label="Dark mode" role="menuitem" />
 
-                            <form method="POST" action="{{ route('logout') }}" class="user-menu__logout">
-                                @csrf
-                                <button type="submit" class="user-menu__item user-menu__item--button">
-                                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-                                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                                        <polyline points="16 17 21 12 16 7"></polyline>
-                                        <line x1="21" y1="12" x2="9" y2="12"></line>
-                                    </svg>
-                                    <span>Sign out</span>
-                                </button>
-                            </form>
+                            <div class="user-menu__divider" role="separator"></div>
+
+                            <x-sign-out />
                         </div>
                     </div>
                 </div>
             </div>
         </header>
-
-        <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
-            <div class="sidebar__brand">
-                <a href="{{ route('dashboard') }}" class="brand" aria-label="Photo Backup Organizer home">
-                    <svg class="brand__icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
-                        <path fill="currentColor" d="M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2ZM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5Z"/>
-                    </svg>
-                    <span>Photo Backup</span>
-                </a>
-            </div>
-
-            <div class="sidebar__nav">
-                <x-nav-tabs :compact="true"></x-nav-tabs>
-            </div>
-
-            <div class="sidebar__footer">
-                <x-theme-toggle variant="sidebar" label="Light mode" />
-                <a class="sidebar__user" href="{{ route('settings') }}">
-                    <span class="avatar avatar--sm" role="img" aria-label="Signed in as {{ auth()->user()->name }}">
-                        <span class="avatar__initials" aria-hidden="true">{{ auth()->user()->initials() }}</span>
-                    </span>
-                    <span class="sidebar__name">{{ auth()->user()->name }}</span>
-                </a>
-                <form method="POST" action="{{ route('logout') }}">
-                    @csrf
-                    <button type="submit" class="btn btn--ghost btn--sm">Sign out</button>
-                </form>
-            </div>
-        </aside>
-
-        <div class="sidebar-backdrop" id="sidebar-backdrop" aria-hidden="true"></div>
 
         <div class="app-main">
             <main id="main-content" class="page">
@@ -119,9 +87,15 @@
                 {{ $slot }}
             </main>
         </div>
+
+        <x-mobile-nav />
     </div>
 
     <x-flash-region></x-flash-region>
+
+    @unless (request()->routeIs('private'))
+        <x-private-gate />
+    @endunless
 
     <dialog class="dialog" id="bulk-archive-dialog" aria-labelledby="bulk-archive-title" aria-describedby="bulk-archive-desc">
         <h2 class="dialog__title" id="bulk-archive-title">Archive selected photos?</h2>

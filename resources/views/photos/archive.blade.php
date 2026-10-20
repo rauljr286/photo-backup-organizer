@@ -1,11 +1,16 @@
 <x-app-layout :title="'Archive'">
     <div class="dashboard">
-        <div class="dashboard__top">
-            <div>
-                <h1 class="page-title">Archive</h1>
-                <p class="page-subtitle">
-                    Archived photos are kept safely and hidden from your photo grid until you restore them.
-                </p>
+        <div class="section-head">
+            <span class="section-head__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
+                    <rect x="2" y="3" width="20" height="5" rx="1"></rect>
+                    <path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path>
+                    <path d="M10 12h4"></path>
+                </svg>
+            </span>
+            <div class="section-head__text">
+                <h1 class="section-head__title">Archive</h1>
+                <p class="section-head__subtitle">{{ number_format($photos->total()) }} {{ \Illuminate\Support\Str::plural('photo', $photos->total()) }} &middot; kept safely and hidden from your photo grid until you restore them.</p>
             </div>
         </div>
 

@@ -44,7 +44,7 @@ class RegisterRequest extends FormRequest
             'last_name' => ['nullable', 'string', 'max:100'],
             'suffix' => ['nullable', 'string', 'in:'.implode(',', self::SUFFIXES)],
             'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email'],
-            'phone' => ['nullable', 'string', new PhoneNumber(), 'unique:users,phone'],
+            'phone' => ['nullable', 'string', new PhoneNumber, 'unique:users,phone'],
             'password' => [
                 'required',
                 'string',

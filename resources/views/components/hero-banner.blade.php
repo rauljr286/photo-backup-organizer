@@ -34,6 +34,7 @@
             @if ($subtitle)
                 <p class="hero__subtitle">{{ $subtitle }}</p>
             @endif
+
         </div>
     </div>
 

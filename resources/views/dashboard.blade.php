@@ -3,10 +3,11 @@
         <x-hero-banner
             :greeting="'Welcome back, ' . \Illuminate\Support\Str::before(auth()->user()->name, ' ') . '!'"
             :eyebrow="'Your photo library'"
-            :subtitle="'Your library at a glance — upload, tidy and keep it all safely backed up.'"
+            :subtitle="'All of your memories, safely backed up and organized in one place.'"
+
             :user="auth()->user()"
             :stats="[
-                ['icon' => 'photo', 'value' => $photos->total(), 'label' => 'Photos', 'tint' => 'stat__icon--primary'],
+                ['icon' => 'photo', 'value' => $activeCount, 'label' => 'Photos', 'tint' => 'stat__icon--primary'],
                 ['icon' => 'album', 'value' => $albums->count(), 'label' => 'Albums', 'tint' => 'stat__icon--accent'],
                 ['icon' => 'storage', 'value' => $usedPercent . '%', 'label' => 'Storage used', 'note' => number_format($usedBytes / 1024 / 1024, 1) . ' of ' . number_format($limitBytes / 1024 / 1024, 0) . ' MB', 'meter' => $usedPercent, 'tint' => 'stat__icon--teal'],
                 ['icon' => 'archive', 'value' => $archivedCount, 'label' => 'Archived', 'tint' => 'stat__icon--rose'],
@@ -19,18 +20,18 @@
             <x-upload-dropzone :album-id="$activeAlbum"></x-upload-dropzone>
 
             <section class="filter-bar" aria-labelledby="filter-heading">
-                <h2 class="visually-hidden" id="filter-heading">Search and filter your photos</h2>
+                <h2 class="filter-bar__title" id="filter-heading">Filter your photos</h2>
                 <form method="GET" action="{{ route('dashboard') }}" class="filter-form" id="filter-form">
                     <input type="hidden" name="album" value="{{ $activeAlbum }}">
 
                     <div class="field field--inline">
-                        <label class="visually-hidden" for="search">Search photos</label>
-                        <input class="field__input" id="search" type="search" name="search" value="{{ request('search') }}" placeholder="Search by name, caption or tag&hellip;">
+                        <label class="field__label field__label--compact" for="search">Search</label>
+                        <input class="field__input" id="search" type="search" name="search" value="{{ request('search') }}" placeholder="Search by name, date or tags">
                     </div>
 
                     <div class="field field--inline">
-                        <label class="visually-hidden" for="tags">Filter by tag</label>
-                        <input class="field__input" id="tags" name="tags" list="all-tags" value="{{ $activeTags->implode(', ') }}" placeholder="Tags (comma separated)">
+                        <label class="field__label field__label--compact" for="tags">Tags</label>
+                        <input class="field__input" id="tags" name="tags" list="all-tags" value="{{ $activeTags->implode(', ') }}" placeholder="e.g. family, beach">
                         <datalist id="all-tags">
                             @foreach ($allTags as $tag)
                                 <option value="{{ $tag }}"></option>
@@ -49,8 +50,8 @@
                     </div>
 
                     <div class="filter-bar__actions">
-                        <button type="submit" class="btn btn--primary btn--sm">Apply filters</button>
-                        <a class="btn btn--ghost btn--sm" href="{{ route('dashboard') }}">Clear filters</a>
+                        <button type="submit" class="btn btn--primary btn--sm">Apply</button>
+                        <a class="btn btn--ghost btn--sm" href="{{ route('dashboard') }}">Reset</a>
                     </div>
                 </form>
             </section>
@@ -65,7 +66,7 @@
                 </span>
                 <div class="section-head__text">
                     <h1 class="section-head__title">My photos</h1>
-                    <p class="section-head__subtitle">Upload, organize and keep your photos safely backed up.</p>
+                    <p class="section-head__subtitle">{{ number_format($photos->total()) }} {{ \Illuminate\Support\Str::plural('photo', $photos->total()) }}</p>
                 </div>
                 <div class="section-head__actions dashboard__top-actions">
                     @if ($unbackedUpCount > 0)
@@ -84,7 +85,9 @@
                 </div>
             </div>
 
-            <section class="photo-section" aria-labelledby="photos-heading">
+            <section class="photo-section" id="photo-section" aria-labelledby="photos-heading"
+                data-latest-url="{{ route('photos.latest') }}"
+                data-latest-id="{{ $photos->getCollection()->max('id') ?? 0 }}">
                 <h2 class="visually-hidden" id="photos-heading">Your photo grid</h2>
 
                 @if ($photos->isEmpty() && $photos->total() === 0)
@@ -146,7 +149,6 @@
                         </div>
                     </div>
                 @else
-                    <p class="photo-section__count">{{ $photos->total() }} photo(s)</p>
                     <div class="photo-grid" id="photo-grid">
                         @foreach ($photos as $photo)
                             <x-photo-card :photo="$photo" :selectable="true"></x-photo-card>

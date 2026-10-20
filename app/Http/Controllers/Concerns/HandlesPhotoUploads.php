@@ -19,11 +19,20 @@ trait HandlesPhotoUploads
 {
     public function uploadPhotos(StorePhotoRequest $request): JsonResponse
     {
+        return $this->handlePhotoUpload($request, false);
+    }
+
+    /**
+     * Shared upload orchestration. When $private is true the files are stored
+     * in the password-protected private gallery instead of the normal library.
+     */
+    protected function handlePhotoUpload(StorePhotoRequest $request, bool $private): JsonResponse
+    {
         $service = app(PhotoStorageService::class);
         $user = $request->user();
         $album = null;
 
-        if ($request->filled('album_id')) {
+        if (! $private && $request->filled('album_id')) {
             $album = $user->albums()->findOrFail($request->album_id);
         }
 
@@ -42,6 +51,7 @@ trait HandlesPhotoUploads
             $request->input('alt_texts', []),
             $request->input('keys', []),
             $request->input('tags'),
+            $private,
         );
 
         $uploaded = collect($result['uploaded'])
@@ -82,6 +92,7 @@ trait HandlesPhotoUploads
             'mime_type' => $photo->mime_type,
             'taken_at' => $photo->taken_at?->toISOString(),
             'tags' => $photo->tags ?? [],
+            'backed_up' => $photo->isBackedUp(),
         ];
     }
 

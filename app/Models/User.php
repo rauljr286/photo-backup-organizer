@@ -12,8 +12,8 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'phone', 'password', 'storage_limit_mb', 'avatar_path', 'agreed_to_terms_at', 'provider', 'provider_id'])]
-#[Hidden(['password', 'remember_token'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'private_password', 'storage_limit_mb', 'avatar_path', 'agreed_to_terms_at', 'provider', 'provider_id'])]
+#[Hidden(['password', 'private_password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -39,8 +39,10 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'private_password' => 'hashed',
             'storage_limit_mb' => 'integer',
             'agreed_to_terms_at' => 'datetime',
+            'deletion_requested_at' => 'datetime',
         ];
     }
 
@@ -103,11 +105,50 @@ class User extends Authenticatable
     }
 
     /**
+     * Whether the user has an open account-deletion request. Requests are
+     * reviewed manually, so the account is never removed automatically.
+     */
+    public function hasRequestedDeletion(): bool
+    {
+        return ! is_null($this->deletion_requested_at);
+    }
+
+    /**
+     * File an account-deletion request (idempotent).
+     */
+    public function requestDeletion(): void
+    {
+        if (! $this->hasRequestedDeletion()) {
+            $this->deletion_requested_at = now();
+            $this->save();
+        }
+    }
+
+    /**
+     * Withdraw an account-deletion request.
+     */
+    public function cancelDeletion(): void
+    {
+        if ($this->hasRequestedDeletion()) {
+            $this->deletion_requested_at = null;
+            $this->save();
+        }
+    }
+
+    /**
      * Photos owned by this user (including trashed ones).
      */
     public function photos(): HasMany
     {
         return $this->hasMany(Photo::class);
+    }
+
+    /**
+     * Photos in the user's password-protected private gallery.
+     */
+    public function privatePhotos(): HasMany
+    {
+        return $this->hasMany(Photo::class)->where('is_private', true);
     }
 
     /**
@@ -119,11 +160,40 @@ class User extends Authenticatable
     }
 
     /**
+     * Whether the user has set up a private gallery password. Until one is
+     * chosen, the private gallery cannot be used.
+     */
+    public function hasPrivatePassword(): bool
+    {
+        return filled($this->private_password);
+    }
+
+    /**
      * Total bytes currently used by this user's photos.
      */
     public function storageUsedBytes(): int
     {
         return (int) $this->photos()->sum('size_bytes');
+    }
+
+    /**
+     * Bytes used by photos in the normal (non-private) library. Private photos
+     * are kept out of the library storage totals.
+     */
+    public function libraryStorageUsedBytes(): int
+    {
+        return (int) $this->photos()->where('is_private', false)->sum('size_bytes');
+    }
+
+    /**
+     * Percentage (0-100) of the storage allowance used by the non-private
+     * library.
+     */
+    public function libraryStorageUsedPercent(): float
+    {
+        $limit = $this->storageLimitBytes();
+
+        return $limit > 0 ? round($this->libraryStorageUsedBytes() / $limit * 100, 1) : 0.0;
     }
 
     /**
