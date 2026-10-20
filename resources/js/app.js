@@ -1800,6 +1800,57 @@ function initAuthCard() {
     }
 }
 
+/* ---------------- Phone filter sheet ---------------- */
+
+/* On phones the dashboard/album filter card is a bottom sheet opened by the
+ * phone-only "Filters" trigger. The trigger, close button and backdrop are
+ * hidden by CSS above 768px, so this only ever runs on phones. */
+function initFilterSheet() {
+    document.querySelectorAll('.filter-bar[id]').forEach((sheet) => {
+        const trigger = document.querySelector(`[data-filter-open][aria-controls="${sheet.id}"]`);
+        if (!trigger) return;
+        const backdrop = document.querySelector('[data-filter-backdrop]');
+        const closeBtn = sheet.querySelector('[data-filter-close]');
+
+        const isOpen = () => sheet.classList.contains('is-open');
+
+        const setOpen = (open) => {
+            sheet.classList.toggle('is-open', open);
+            backdrop?.classList.toggle('is-open', open);
+            document.body.classList.toggle('filter-sheet-open', open);
+            trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+            if (open) {
+                sheet.querySelector('input[type="search"], input:not([type="hidden"]), select, button')?.focus({ preventScroll: true });
+            } else {
+                trigger.focus({ preventScroll: true });
+            }
+        };
+
+        trigger.setAttribute('aria-expanded', 'false');
+        trigger.addEventListener('click', () => setOpen(!isOpen()));
+        closeBtn?.addEventListener('click', () => setOpen(false));
+        backdrop?.addEventListener('click', () => setOpen(false));
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isOpen()) {
+                e.preventDefault();
+                setOpen(false);
+            }
+        });
+
+        // Crossing back to desktop widths must not leave the sheet open.
+        const desktopQuery = window.matchMedia('(min-width: 768px)');
+        const onBreakpointChange = () => {
+            if (desktopQuery.matches) setOpen(false);
+        };
+        if (typeof desktopQuery.addEventListener === 'function') {
+            desktopQuery.addEventListener('change', onBreakpointChange);
+        } else if (typeof desktopQuery.addListener === 'function') {
+            desktopQuery.addListener(onBreakpointChange);
+        }
+    });
+}
+
 /* ---------------- Bootstrap ---------------- */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1810,6 +1861,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initPrivateGate();
     initZoom();
     initFilters();
+    initFilterSheet();
     initTabBars();
     initPasswordToggles();
     initSidebar();

@@ -22,8 +22,14 @@
 
 
 
-        <section class="filter-bar" aria-labelledby="filter-heading">
+        <section class="filter-bar" id="filter-sheet" aria-labelledby="filter-heading">
             <h2 class="visually-hidden" id="filter-heading">Filter photos in this album</h2>
+            <button type="button" class="filter-bar__close" data-filter-close aria-label="Close filters">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
             <form method="GET" action="{{ route('albums.show', $album) }}" class="filter-form" id="filter-form">
                 <input type="hidden" name="album" value="{{ $album->id }}">
 
@@ -58,6 +64,15 @@
                 </div>
             </form>
         </section>
+
+        <div class="filter-sheet-backdrop" data-filter-backdrop aria-hidden="true"></div>
+
+        <button type="button" class="filter-sheet-trigger" data-filter-open aria-controls="filter-sheet">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+            </svg>
+            <span>Filters</span>
+        </button>
 
         @if ($photos->isEmpty())
             <div class="empty-state">

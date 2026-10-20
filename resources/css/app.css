@@ -6622,3 +6622,109 @@ img {
         overflow-x: hidden;
     }
 }
+
+/* ---------- Phone filter sheet (<=767.98px) ----------
+ * The dashboard/album filter card becomes a bottom sheet on phones: a
+ * "Filters" trigger opens it, a backdrop and Escape close it. Above 768px
+ * the trigger, close button and backdrop stay hidden and the filter card
+ * keeps its in-page layout. */
+
+.filter-sheet-trigger,
+.filter-bar__close,
+.filter-sheet-backdrop {
+    display: none;
+}
+
+@media (max-width: 767.98px) {
+    .filter-sheet-trigger {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        min-height: 44px;
+        padding: 0.5rem 1rem;
+        border: 1px solid var(--color-border);
+        border-radius: 10px;
+        background: var(--color-surface);
+        color: var(--color-heading);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: var(--shadow-soft);
+    }
+
+    .filter-bar {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 260;
+        border: 1px solid var(--color-border-soft);
+        border-bottom: none;
+        border-radius: 16px 16px 0 0;
+        padding: 1rem 1rem calc(1.1rem + env(safe-area-inset-bottom, 0px));
+        max-height: min(85vh, 560px);
+        overflow-y: auto;
+        transform: translateY(110%);
+        transition: transform 0.25s ease;
+    }
+
+    .filter-bar.is-open {
+        transform: translateY(0);
+    }
+
+    .filter-bar__close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        top: 0.55rem;
+        right: 0.55rem;
+        width: 44px;
+        height: 44px;
+        border: none;
+        border-radius: 12px;
+        background: transparent;
+        color: var(--color-muted);
+        cursor: pointer;
+    }
+
+    .filter-bar__close:hover,
+    .filter-bar__close:focus-visible {
+        background: var(--color-surface-muted);
+        color: var(--color-heading);
+    }
+
+    .filter-bar__title {
+        padding-right: 3rem;
+    }
+
+    .filter-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-form .field--inline {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+
+    .filter-sheet-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 255;
+        background: rgba(15, 23, 42, 0.55);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s ease;
+    }
+
+    .filter-sheet-backdrop.is-open {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    body.filter-sheet-open {
+        overflow: hidden;
+    }
+}
