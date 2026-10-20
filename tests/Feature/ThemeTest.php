@@ -50,7 +50,8 @@ class ThemeTest extends TestCase
         $response->assertSee("setAttribute('data-theme'", false);
         $response->assertSee('data-theme-toggle', false);
         $response->assertSee('name="color-scheme"', false);
-        // Both the navbar toggle and the labelled toggle in the mobile menu.
-        $this->assertSame(2, substr_count($response->getContent(), 'data-theme-toggle'));
+        // The navbar toggle, the toggle in the 768-899.98px bottom bar's More
+        // panel, and the toggle in the phone (<=767.98px) More panel.
+        $this->assertSame(3, substr_count($response->getContent(), 'data-theme-toggle'));
     }
 }

@@ -1,4 +1,4 @@
-<x-app-layout :title="$photo->original_filename" body-class="pd-page">
+<x-app-layout :title="$photo->original_filename" :back-url="route('dashboard')" body-class="pd-page">
     <div class="pd">
         {{-- Title row --}}
         <div class="pd__top">

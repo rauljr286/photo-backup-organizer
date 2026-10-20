@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <x-theme-head />
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="description" content="Back up, organize and browse your photos securely and privately.">
@@ -64,6 +64,17 @@
                 </div>
             </div>
         </header>
+
+        <div class="topbar__mobile">
+            @if (!empty($backUrl ?? null))
+                <a class="topbar__mobile-back" href="{{ $backUrl }}" aria-label="Back">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </a>
+            @endif
+            <span class="topbar__mobile-title">{{ $title ?? '' }}</span>
+        </div>
 
         <div class="app-main">
             <main id="main-content" class="page">

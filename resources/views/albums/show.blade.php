@@ -1,4 +1,4 @@
-<x-app-layout :title="$album->name">
+<x-app-layout :title="$album->name" :back-url="route('albums.index')">
     <div class="dashboard dashboard--stack">
         <div class="section-head">
             <span class="section-head__icon" aria-hidden="true">

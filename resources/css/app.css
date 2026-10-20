@@ -6522,3 +6522,103 @@ img {
         display: none;
     }
 }
+
+/* ---------- Phone app shell (<=767.98px) ----------
+ * The 768-899.98px band keeps the original bottom bar and top bar exactly as
+ * before; phones below 768px swap in the phone-specific bottom bar (five tabs
+ * + More), a compact title row with an optional back button, safe-area
+ * padding, 44px touch targets and press feedback. */
+
+.bottom-nav--phone,
+.topbar__mobile {
+    display: none;
+}
+
+@media (max-width: 767.98px) {
+    .bottom-nav:not(.bottom-nav--phone) {
+        display: none;
+    }
+
+    .bottom-nav--phone {
+        display: flex;
+    }
+
+    .topbar__mobile {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        min-height: 44px;
+        padding: 0.2rem 1rem 0.55rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.14);
+        color: var(--color-on-brand);
+    }
+
+    .topbar__mobile-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 44px;
+        height: 44px;
+        margin-left: -0.55rem;
+        border-radius: 12px;
+        color: inherit;
+        text-decoration: none;
+    }
+
+    .topbar__mobile-back:hover,
+    .topbar__mobile-back:focus-visible {
+        background: rgba(255, 255, 255, 0.14);
+    }
+
+    .topbar__mobile-title {
+        min-width: 0;
+        flex: 1;
+        font-size: 1rem;
+        font-weight: 700;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .topbar__inner {
+        padding-top: calc(0.7rem + env(safe-area-inset-top, 0px));
+    }
+
+    .toast-region {
+        left: 0.75rem;
+        right: 0.75rem;
+        bottom: calc(4.75rem + env(safe-area-inset-bottom, 0px));
+        max-width: none;
+    }
+
+    .bulk-bar {
+        left: 0.75rem;
+        right: 0.75rem;
+        width: auto;
+        transform: translateY(150%);
+    }
+
+    .bulk-bar.is-visible {
+        transform: translateY(0);
+    }
+
+    .btn,
+    .field__input,
+    .field select,
+    .field textarea {
+        min-height: 44px;
+    }
+
+    .btn:active,
+    .bottom-nav__item:active,
+    .topbar__mobile-back:active,
+    .topbar__brand:active {
+        transform: scale(0.97);
+        opacity: 0.92;
+    }
+
+    body {
+        overflow-x: hidden;
+    }
+}
