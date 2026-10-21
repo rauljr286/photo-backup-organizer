@@ -18,7 +18,7 @@ class RemoteFilesystemAdapter extends FilesystemAdapter
      * @param  string  $path
      * @return string
      *
-     * @throws \RuntimeException
+     * @throws RuntimeException
      */
     public function path($path)
     {
