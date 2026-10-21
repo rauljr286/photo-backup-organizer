@@ -6526,7 +6526,7 @@ img {
 /* ---------- Phone app shell (<=767.98px) ----------
  * The 768-899.98px band keeps the original bottom bar and top bar exactly as
  * before; phones below 768px swap in the phone-specific bottom bar (Dashboard,
- * Albums, Insights, Upload, Settings + More), a compact title row with an optional back button, safe-area
+ * Albums, Insights, Settings + More), a compact title row with an optional back button, safe-area
  * padding, 44px touch targets and press feedback. */
 
 .bottom-nav--phone,
@@ -6818,9 +6818,10 @@ img {
         touch-action: pan-y;
     }
 
+    /* Phones navigate by swiping; hide the arrow buttons here. Desktop
+       (>=768px) keeps them visible. */
     .pd-viewer__nav {
-        width: 44px;
-        height: 44px;
+        display: none;
     }
 
     .pd-tip {
@@ -7213,13 +7214,14 @@ img {
 
     .dashboard > .hero .hero__content--profile {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: center;
         gap: 0.9rem;
         width: 100%;
     }
 
     .dashboard > .hero .hero__intro {
         width: 100%;
+        text-align: center;
     }
 
     .dashboard > .hero .hero__stats {
@@ -7532,13 +7534,25 @@ img {
         height: 26px;
     }
 
+    /* The phone title bar only matters when it carries a back button
+       (album/photo detail). The page title repeats the bottom-nav tab, so
+       hide it, and collapse the bar entirely on pages without a back button. */
     .topbar__mobile {
         min-height: 48px;
         padding: 0.15rem var(--m-pad) 0.4rem;
     }
 
     .topbar__mobile-title {
-        font-size: 0.95rem;
+        display: none;
+    }
+
+    .topbar__mobile:not(:has(.topbar__mobile-back)) {
+        display: none;
+    }
+
+    .topbar__mobile:has(.topbar__mobile-back) {
+        min-height: 44px;
+        padding: 0;
     }
 
     /* ---------------- Bottom tab bar (56px + safe area) -------------- */
@@ -7678,11 +7692,17 @@ img {
         margin-top: 0.05rem;
     }
 
-    /* Filter trigger: compact pill. */
-    .filter-sheet-trigger {
+    /* Filter trigger: matches the Manage albums secondary button. */
+    .dashboard .filter-sheet-trigger {
+        width: 100%;
+        justify-content: center;
         min-height: var(--m-tap-secondary);
         padding: 0.4rem 0.85rem;
+        border: 2px solid var(--color-primary-outline);
         border-radius: 10px;
+        background: var(--color-surface);
+        color: var(--color-primary);
+        box-shadow: var(--shadow-soft);
         font-size: var(--m-text);
     }
 
@@ -7695,6 +7715,13 @@ img {
     .dashboard .section-head__actions .btn,
     .dashboard__top-actions .btn {
         min-height: var(--m-tap-primary);
+    }
+
+    /* "All photos backed up" and "Manage albums": compact secondary size. */
+    .dashboard .dashboard__top-actions > .btn {
+        min-height: var(--m-tap-secondary);
+        padding: 0.4rem 0.6rem;
+        font-size: var(--m-sub);
     }
 }
 
@@ -7891,52 +7918,65 @@ img {
     }
 
     .album-card__link {
-        display: flex;
+        display: grid;
+        grid-template-columns: auto 1fr;
+        grid-template-areas: "icon count" "name name";
         align-items: center;
-        gap: 0.55rem;
+        gap: 0.35rem 0.55rem;
+        min-width: 0;
     }
 
     .album-card__icon {
-        width: 32px;
-        height: 32px;
-        border-radius: 9px;
+        grid-area: icon;
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
         flex-shrink: 0;
     }
 
     .album-card__icon svg {
-        width: 18px;
-        height: 18px;
+        width: 20px;
+        height: 20px;
     }
 
     .album-card__name {
-        font-size: 0.95rem;
-        margin: 0;
+        grid-area: name;
+        font-size: 1rem;
+        line-height: 1.3;
+        margin: 0.1rem 0 0;
         min-width: 0;
+        overflow-wrap: break-word;
+        word-break: normal;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
         overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
 
     .album-card__count {
+        grid-area: count;
+        justify-self: end;
         font-size: 0.75rem;
-        margin-left: auto;
+        flex-shrink: 0;
         white-space: nowrap;
     }
 
     .album-card__actions {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 6px;
+        display: flex;
+        flex-direction: column;
+        gap: var(--m-tap-gap);
         padding-top: 0.5rem;
     }
 
     .album-card__actions .btn {
+        width: 100%;
         min-height: var(--m-tap-inline);
-        padding: 0 0.35rem;
-        font-size: 12.5px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        padding: 0 0.6rem;
+        font-size: 13px;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: clip;
+        text-align: center;
     }
 }
 
@@ -8054,12 +8094,27 @@ img {
         margin-bottom: 0.6rem;
     }
 
+    /* All four cleanup categories visible at once (2 columns). */
+    .tabbar__list {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        flex-wrap: nowrap;
+        overflow-x: visible;
+        gap: 0.4rem;
+        padding: 0.4rem;
+    }
+
     .tabbar__btn {
+        width: 100%;
+        justify-content: center;
+        text-align: center;
         min-height: var(--m-tap-secondary);
-        padding: 0.35rem 0.7rem;
+        padding: 0.35rem 0.5rem;
         font-size: var(--m-sub);
         gap: 0.35rem;
+        white-space: normal;
     }
+
 
     .photo-row {
         gap: 0.6rem;
@@ -8186,7 +8241,7 @@ img {
 
     .app-shell {
         background-image:
-            linear-gradient(rgba(243, 242, 238, 0.94), rgba(243, 242, 238, 0.94)),
+            linear-gradient(var(--backdrop-veil), var(--backdrop-veil)),
             var(--camera-pattern);
     }
 }

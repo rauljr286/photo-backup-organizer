@@ -8,7 +8,6 @@
             </span>
             <div class="section-head__text">
                 <h1 class="section-head__title">Albums</h1>
-                <p class="section-head__subtitle">{{ number_format($albums->count()) }} {{ \Illuminate\Support\Str::plural('album', $albums->count()) }} &middot; group related photos you can browse and download.</p>
             </div>
         </div>
 

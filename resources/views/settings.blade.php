@@ -14,7 +14,6 @@
 
         <div class="profile__head">
             <h2 class="profile__head-title">Account settings</h2>
-            <p class="profile__head-sub">Manage your profile, password and privacy in one place.</p>
         </div>
 
         <div class="profile__body">

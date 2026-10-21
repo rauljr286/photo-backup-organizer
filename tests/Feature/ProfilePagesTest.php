@@ -75,7 +75,6 @@ class ProfilePagesTest extends TestCase
             ->assertSee('profile-page', false)
             ->assertSee('Your profile')
             ->assertSee('Account settings')
-            ->assertSee('Manage your profile, password and privacy in one place.')
             ->assertSee('Profile')
             ->assertSee('Security')
             ->assertSee('Privacy &amp; data', false)

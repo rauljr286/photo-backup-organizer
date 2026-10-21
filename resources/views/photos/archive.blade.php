@@ -10,7 +10,6 @@
             </span>
             <div class="section-head__text">
                 <h1 class="section-head__title">Archive</h1>
-                <p class="section-head__subtitle">{{ number_format($photos->total()) }} {{ \Illuminate\Support\Str::plural('photo', $photos->total()) }} &middot; kept safely and hidden from your photo grid until you restore them.</p>
             </div>
         </div>
 

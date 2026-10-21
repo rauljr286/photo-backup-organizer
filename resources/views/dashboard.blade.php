@@ -3,7 +3,6 @@
         <x-hero-banner
             :greeting="'Welcome back, ' . \Illuminate\Support\Str::before(auth()->user()->name, ' ') . '!'"
             :eyebrow="'Your photo library'"
-            :subtitle="'All of your memories, safely backed up and organized in one place.'"
 
             :user="auth()->user()"
             :stats="[
@@ -73,17 +72,6 @@
             </button>
 
             <div class="section-head">
-                <span class="section-head__icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" focusable="false">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <circle cx="8.5" cy="8.5" r="1.5"></circle>
-                        <path d="m21 15-5-5L5 21"></path>
-                    </svg>
-                </span>
-                <div class="section-head__text">
-                    <h1 class="section-head__title">My photos</h1>
-                    <p class="section-head__subtitle">{{ number_format($photos->total()) }} {{ \Illuminate\Support\Str::plural('photo', $photos->total()) }}</p>
-                </div>
                 <div class="section-head__actions dashboard__top-actions">
                     @if ($unbackedUpCount > 0)
                         <form method="POST" action="{{ route('backup.now') }}" class="inline-form">

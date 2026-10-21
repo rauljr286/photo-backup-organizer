@@ -998,13 +998,12 @@ function initZoom() {
 /* ---------------- Phone photo detail (<=767.98px) ---------------- */
 
 function initPhoneViewer() {
-    const mq = window.matchMedia('(max-width: 767.98px)');
     const stage = document.getElementById('zoom-stage');
     const img = document.getElementById('zoom-image');
     if (!stage || !img) return;
 
-    // Swipe only when server-rendered prev/next links exist (no controller
-    // changes). Passive listeners: never block page scroll or browser zoom.
+    // Swipe to move between photos, at every screen size. Only when
+    // server-rendered prev/next links exist (no controller changes).
     const prev = document.querySelector('.pd-viewer__nav--prev');
     const next = document.querySelector('.pd-viewer__nav--next');
     if (!prev && !next) return;
@@ -1014,12 +1013,19 @@ function initPhoneViewer() {
         return (parseFloat(text) || 100) > 100;
     };
 
+    const go = (dx) => {
+        const link = dx < 0 ? next : prev;
+        if (link) window.location.href = link.href;
+    };
+
+    // Touch: always available. Passive listeners so page scroll and
+    // browser zoom are never blocked.
     let startX = 0;
     let startY = 0;
     let tracking = false;
 
     stage.addEventListener('touchstart', (e) => {
-        if (!mq.matches || e.touches.length !== 1 || zoomedIn()) return;
+        if (e.touches.length !== 1 || zoomedIn()) return;
         tracking = true;
         startX = e.touches[0].clientX;
         startY = e.touches[0].clientY;
@@ -1028,14 +1034,38 @@ function initPhoneViewer() {
     stage.addEventListener('touchend', (e) => {
         if (!tracking) return;
         tracking = false;
-        if (!mq.matches) return;
         const t = e.changedTouches[0];
         const dx = t.clientX - startX;
         const dy = t.clientY - startY;
         if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-        const link = dx < 0 ? next : prev;
-        if (link) window.location.href = link.href;
+        go(dx);
     }, { passive: true });
+
+    // Mouse/trackpad: drag horizontally to move between photos. Skipped
+    // while zoomed in, so it never fights the drag-to-pan handler.
+    let pStartX = 0;
+    let pStartY = 0;
+    let pDrag = false;
+
+    stage.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'touch' || zoomedIn()) return;
+        pDrag = true;
+        pStartX = e.clientX;
+        pStartY = e.clientY;
+    });
+
+    stage.addEventListener('pointerup', (e) => {
+        if (e.pointerType === 'touch' || !pDrag) return;
+        pDrag = false;
+        const dx = e.clientX - pStartX;
+        const dy = e.clientY - pStartY;
+        if (Math.abs(dx) < 80 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+        go(dx);
+    });
+
+    stage.addEventListener('pointerleave', () => {
+        pDrag = false;
+    });
 }
 
 function initPhoneActionbar() {
@@ -1281,10 +1311,9 @@ function initUserMenu() {
             setOpen(menu, next);
         });
 
-        // Following a link dismisses the menu; the theme toggle and the
-        // sign-out button intentionally keep it open.
-        panel.addEventListener('click', (e) => {
-            if (e.target.closest('a')) setOpen(menu, false);
+        // Tapping any menu item dismisses the menu.
+        panel.addEventListener('click', () => {
+            setOpen(menu, false);
         });
     });
 

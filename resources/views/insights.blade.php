@@ -3,7 +3,6 @@
         <div class="dashboard__top">
             <div>
                 <h1 class="page-title">Insights</h1>
-                <p class="page-subtitle">A quick look at how your photo library has grown.</p>
             </div>
             <div class="dashboard__top-actions">
                 <a class="btn btn--ghost" href="{{ route('cleanup') }}">Suggestions for freeing space</a>

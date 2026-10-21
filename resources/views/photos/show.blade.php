@@ -63,34 +63,19 @@
                     </div>
 
                     <div class="pd-zoom">
-                        <button type="button" class="pd-zoom__btn" id="zoom-out">Zoom out</button>
-                        <button type="button" class="pd-zoom__btn" id="zoom-in">Zoom in</button>
-                        <button type="button" class="pd-zoom__btn" id="zoom-reset">Reset zoom</button>
-
-                        @if ($photo->isRotatable())
-                            <form method="POST" action="{{ route('photos.rotate', $photo) }}" class="pd-inline-form">
-                                @csrf
-                                <input type="hidden" name="direction" value="left">
-                                <button type="submit" class="pd-zoom__btn pd-zoom__btn--icon" aria-label="Rotate 90 degrees left">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-                                </button>
-                            </form>
-                            <form method="POST" action="{{ route('photos.rotate', $photo) }}" class="pd-inline-form">
-                                @csrf
-                                <input type="hidden" name="direction" value="right">
-                                <button type="submit" class="pd-zoom__btn pd-zoom__btn--icon" aria-label="Rotate 90 degrees right">
-                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
-                                </button>
-                            </form>
-                        @endif
-
                         <span class="pd-zoom__level" id="zoom-level" role="status" aria-live="polite" aria-label="Zoom level 100 percent">100%</span>
                     </div>
 
-                    <p class="pd-tip">
-                        Tip: browse photos with the arrow buttons or the
-                        <kbd class="pd-kbd">&larr;</kbd> <kbd class="pd-kbd">&rarr;</kbd> arrow keys.
-                    </p>
+                    @if ($photo->isRotatable())
+                        {{-- Rotate form is kept out of the viewer controls and
+                             triggered by the phone action bar's Rotate button. --}}
+                        <form method="POST" action="{{ route('photos.rotate', $photo) }}" class="pd-inline-form" hidden>
+                            @csrf
+                            <input type="hidden" name="direction" value="right">
+                            <button type="submit" aria-hidden="true" tabindex="-1">Rotate</button>
+                        </form>
+                    @endif
+
                 </section>
 
                 @unless ($photo->isPrivate())
