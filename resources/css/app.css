@@ -1457,6 +1457,25 @@ img {
     animation: fade-slide 0.2s ease;
 }
 
+/* Offline status banner: shown by JS when the device loses connection. */
+.offline-banner {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.75rem 1rem 0;
+    padding: 0.6rem 0.9rem;
+    border-radius: var(--radius-md);
+    background: var(--color-warning-bg, #fef3c7);
+    color: var(--color-warning-text, #92400e);
+    border: 1px solid var(--color-warning-border, #fde68a);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.offline-banner[hidden] {
+    display: none;
+}
+
 .flash p {
     margin: 0;
 }

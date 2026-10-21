@@ -1103,6 +1103,20 @@ function initServiceWorker() {
             /* offline support is a progressive enhancement */
         });
     });
+
+    // Signing out must not leave cached pages/photos on the device.
+    document.addEventListener('submit', (e) => {
+        const form = e.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        if (!/\/logout$/.test(new URL(form.action, window.location.origin).pathname)) return;
+        const sw = navigator.serviceWorker.controller;
+        if (sw) sw.postMessage({ type: 'pbo-clear-caches' });
+        if (window.caches) {
+            caches.keys().then((keys) =>
+                Promise.all(keys.filter((key) => key.startsWith('pbo-')).map((key) => caches.delete(key)))
+            );
+        }
+    });
 }
 
 /* ---------------- Debounced filters ---------------- */
@@ -2093,6 +2107,21 @@ function initUploadTab() {
     });
 }
 
+/* ---------------- Offline status banner ---------------- */
+
+function initOfflineBanner() {
+    const banner = document.querySelector('[data-offline-banner]');
+    if (!banner) return;
+
+    const update = () => {
+        banner.hidden = navigator.onLine;
+    };
+
+    update();
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+}
+
 /* ---------------- Bootstrap ---------------- */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2126,4 +2155,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initLandingScreen();
     initAuthCard();
     initServiceWorker();
+    initOfflineBanner();
 });
