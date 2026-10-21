@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\Album;
 use App\Models\Photo;
 use App\Models\User;
+use App\Support\FileWrite;
+use App\Support\LocalFileCopy;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Http\UploadedFile;
@@ -16,8 +18,6 @@ use ZipArchive;
 
 class PhotoStorageService
 {
-    protected const LOCAL_DISK = 'public';
-
     protected const THUMBNAIL_MAX_DIMENSION = 400;
 
     public const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
@@ -27,6 +27,15 @@ class PhotoStorageService
     public function __construct()
     {
         $this->fallbackCloudDisk = config('photobackup.local_mirror_disk', 'local');
+    }
+
+    /**
+     * The disk holding the photo originals, the generated thumbnails and the
+     * profile pictures. Defaults to the local "public" disk.
+     */
+    public function photoDisk(): string
+    {
+        return (string) config('photobackup.photo_disk', 'public');
     }
 
     public function validateUpload(UploadedFile $file): ?string
@@ -72,7 +81,7 @@ class PhotoStorageService
         $extension = strtolower($file->getClientOriginalExtension());
         $directory = "photos/{$user->id}";
         $name = Str::uuid().'.'.$extension;
-        $path = $file->storeAs($directory, $name, self::LOCAL_DISK);
+        $path = $file->storeAs($directory, $name, $this->photoDisk());
 
         $photo = new Photo([
             'user_id' => $user->id,
@@ -332,17 +341,26 @@ class PhotoStorageService
      */
     public function backupToCloud(Photo $photo): void
     {
-        if (! Storage::disk(self::LOCAL_DISK)->exists($photo->file_path)) {
+        $disk = $this->photoDisk();
+
+        if (! Storage::disk($disk)->exists($photo->file_path)) {
             throw new \RuntimeException('Photo file missing on disk.');
         }
 
-        $disk = config('photobackup.cloud_disk') ?: $this->fallbackCloudDisk;
+        $cloudDisk = config('photobackup.cloud_disk') ?: $this->fallbackCloudDisk;
         $remotePath = "backups/{$photo->user_id}/".basename($photo->file_path);
 
-        Storage::disk($disk)->put(
-            $remotePath,
-            Storage::disk(self::LOCAL_DISK)->get($photo->file_path),
-        );
+        $stream = Storage::disk($disk)->readStream($photo->file_path);
+
+        if (! is_resource($stream)) {
+            throw new \RuntimeException('Photo file missing on disk.');
+        }
+
+        Storage::disk($cloudDisk)->put($remotePath, $stream);
+
+        if (is_resource($stream)) {
+            fclose($stream);
+        }
 
         $photo->remote_path = $remotePath;
         $photo->backed_up_at = now();
@@ -356,15 +374,17 @@ class PhotoStorageService
      */
     public function purge(Photo $photo): void
     {
-        Storage::disk(self::LOCAL_DISK)->delete($photo->file_path);
+        $disk = $this->photoDisk();
+
+        Storage::disk($disk)->delete($photo->file_path);
 
         if (filled($photo->thumbnail_path)) {
-            Storage::disk(self::LOCAL_DISK)->delete($photo->thumbnail_path);
+            Storage::disk($disk)->delete($photo->thumbnail_path);
         }
 
         if (filled($photo->remote_path)) {
-            $disk = config('photobackup.cloud_disk') ?: $this->fallbackCloudDisk;
-            Storage::disk($disk)->delete($photo->remote_path);
+            $cloudDisk = config('photobackup.cloud_disk') ?: $this->fallbackCloudDisk;
+            Storage::disk($cloudDisk)->delete($photo->remote_path);
         }
 
         $photo->forceDelete();
@@ -372,54 +392,66 @@ class PhotoStorageService
 
     /**
      * Create a square-ish thumbnail capped at 400px on its longest edge.
-     * The JPEG is stored on the public disk and the path is persisted on the
+     * The JPEG is stored on the photo disk and the path is persisted on the
      * photo. Returns the stored thumbnail path, or null when the source file
      * cannot be processed.
      */
     public function generateThumbnail(Photo $photo): ?string
     {
-        $source = Storage::disk(self::LOCAL_DISK)->path($photo->file_path);
-
-        if (! is_file($source)) {
-            return null;
-        }
-
-        $info = @getimagesize($source);
-
-        if ($info === false) {
-            return null;
-        }
-
-        [$width, $height] = $info;
-
-        $sourceImage = match ($info[2]) {
-            IMAGETYPE_JPEG => @imagecreatefromjpeg($source),
-            IMAGETYPE_PNG => @imagecreatefrompng($source),
-            IMAGETYPE_WEBP => @imagecreatefromwebp($source),
-            IMAGETYPE_GIF => @imagecreatefromgif($source),
-            default => false,
-        };
-
-        if ($sourceImage === false) {
-            return null;
-        }
-
-        $scale = min(1, self::THUMBNAIL_MAX_DIMENSION / max($width, $height));
-        $newWidth = max(1, (int) round($width * $scale));
-        $newHeight = max(1, (int) round($height * $scale));
-
-        $thumb = imagecreatetruecolor($newWidth, $newHeight);
-        imagecopyresampled($thumb, $sourceImage, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
-
-        ob_start();
-        imagejpeg($thumb, null, 82);
-        $data = ob_get_clean();
-
-        imagedestroy($sourceImage);
-        imagedestroy($thumb);
-
+        $disk = $this->photoDisk();
         $relativePath = "thumbnails/{$photo->user_id}/".Str::uuid().'.jpg';
-        Storage::disk(self::LOCAL_DISK)->put($relativePath, $data);
+
+        $generated = LocalFileCopy::withLocalCopy(
+            $disk,
+            $photo->file_path,
+            function (string $source) use ($photo, $disk, $relativePath): ?string {
+                if (! is_file($source)) {
+                    return null;
+                }
+
+                $info = @getimagesize($source);
+
+                if ($info === false) {
+                    return null;
+                }
+
+                [$width, $height] = $info;
+
+                $sourceImage = match ($info[2]) {
+                    IMAGETYPE_JPEG => @imagecreatefromjpeg($source),
+                    IMAGETYPE_PNG => @imagecreatefrompng($source),
+                    IMAGETYPE_WEBP => @imagecreatefromwebp($source),
+                    IMAGETYPE_GIF => @imagecreatefromgif($source),
+                    default => false,
+                };
+
+                if ($sourceImage === false) {
+                    return null;
+                }
+
+                $scale = min(1, self::THUMBNAIL_MAX_DIMENSION / max($width, $height));
+                $newWidth = max(1, (int) round($width * $scale));
+                $newHeight = max(1, (int) round($height * $scale));
+
+                $thumb = imagecreatetruecolor($newWidth, $newHeight);
+                imagecopyresampled($thumb, $sourceImage, 0, 0, 0, 0, $newWidth, $newHeight, $width, $height);
+
+                ob_start();
+                imagejpeg($thumb, null, 82);
+                $data = ob_get_clean();
+
+                imagedestroy($sourceImage);
+                imagedestroy($thumb);
+
+                Storage::disk($disk)->put($relativePath, $data);
+
+                return $data;
+            },
+        );
+
+        if ($generated === null) {
+            return null;
+        }
 
         $photo->thumbnail_path = $relativePath;
         $photo->save();
@@ -443,6 +475,20 @@ class PhotoStorageService
     }
 
     /**
+     * SHA-256 content hash of a file stored on the given disk. Works for
+     * remote disks too, where the file is copied to a temporary file first.
+     * Returns an empty string when the file cannot be read.
+     */
+    public function hashStoredFile(string $disk, string $path): string
+    {
+        return (string) LocalFileCopy::withLocalCopy(
+            $disk,
+            $path,
+            fn (string $localPath): string => $this->hashFile($localPath),
+        );
+    }
+
+    /**
      * Build a ZIP archive containing the given photos' original files. Returns
      * the path to a temporary archive, or null when nothing could be packed.
      */
@@ -460,22 +506,45 @@ class PhotoStorageService
         }
 
         $added = 0;
+        $disk = $this->photoDisk();
+        $temporaryFiles = [];
 
-        foreach ($photos as $photo) {
-            $source = Storage::disk(self::LOCAL_DISK)->path($photo->file_path);
+        try {
+            foreach ($photos as $photo) {
+                $entry = $photo->original_filename ?: basename($photo->file_path);
 
-            if (! is_file($source)) {
-                continue;
+                // The archive reads the file when it is closed, so temporary
+                // copies have to stay around until then.
+                LocalFileCopy::withLocalCopy(
+                    $disk,
+                    $photo->file_path,
+                    function (string $source, bool $isTemporary) use ($zip, $entry, &$added, &$temporaryFiles): ?string {
+                        if (! is_file($source)) {
+                            return null;
+                        }
+
+                        if ($zip->addFile($source, $entry)) {
+                            $added++;
+                        }
+
+                        if ($isTemporary) {
+                            $temporaryFiles[] = $source;
+                        }
+
+                        return null;
+                    },
+                    preserveTempFile: true,
+                );
             }
+        } finally {
+            $zip->close();
 
-            $entry = $photo->original_filename ?: basename($photo->file_path);
-
-            if ($zip->addFile($source, $entry)) {
-                $added++;
+            foreach ($temporaryFiles as $temporaryFile) {
+                if (is_file($temporaryFile)) {
+                    @unlink($temporaryFile);
+                }
             }
         }
-
-        $zip->close();
 
         if ($added === 0) {
             @unlink($tmp);
@@ -515,38 +584,49 @@ class PhotoStorageService
      */
     protected function applyRotation(Photo $photo, float $degrees): bool
     {
-        $sourcePath = Storage::disk(self::LOCAL_DISK)->path($photo->file_path);
+        $disk = $this->photoDisk();
 
-        if (! is_file($sourcePath)) {
+        $result = LocalFileCopy::withLocalCopy(
+            $disk,
+            $photo->file_path,
+            function (string $sourcePath) use ($photo, $degrees) {
+                if (! is_file($sourcePath)) {
+                    return false;
+                }
+
+                $source = $this->loadEditableImage($sourcePath);
+
+                if ($source === null) {
+                    return false;
+                }
+
+                $hasAlpha = in_array($photo->mime_type, ['image/png', 'image/webp'], true);
+                $background = $hasAlpha
+                    ? imagecolorallocatealpha($source, 0, 0, 0, 127)
+                    : imagecolorallocate($source, 255, 255, 255);
+
+                $rotated = @imagerotate($source, $degrees, $background);
+                imagedestroy($source);
+
+                if ($rotated === false) {
+                    return false;
+                }
+
+                $data = $this->encodeEditableImage($photo, $rotated);
+                imagedestroy($rotated);
+
+                if ($data === null) {
+                    return false;
+                }
+
+                // The rotated bytes replace the original file on the disk.
+                return FileWrite::of($data);
+            },
+        );
+
+        if (! $result instanceof FileWrite) {
             return false;
         }
-
-        $source = $this->loadEditableImage($sourcePath);
-
-        if ($source === null) {
-            return false;
-        }
-
-        $hasAlpha = in_array($photo->mime_type, ['image/png', 'image/webp'], true);
-        $background = $hasAlpha
-            ? imagecolorallocatealpha($source, 0, 0, 0, 127)
-            : imagecolorallocate($source, 255, 255, 255);
-
-        $rotated = @imagerotate($source, $degrees, $background);
-        imagedestroy($source);
-
-        if ($rotated === false) {
-            return false;
-        }
-
-        $data = $this->encodeEditableImage($photo, $rotated);
-        imagedestroy($rotated);
-
-        if ($data === null) {
-            return false;
-        }
-
-        Storage::disk(self::LOCAL_DISK)->put($photo->file_path, $data);
 
         $photo->remote_path = null;
         $photo->backed_up_at = null;

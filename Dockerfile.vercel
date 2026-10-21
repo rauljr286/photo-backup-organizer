@@ -1,0 +1,131 @@
+# syntax=docker/dockerfile:1
+
+# =============================================================================
+# Base: FrankenPHP 1 on PHP 8.4 (Debian bookworm)
+# =============================================================================
+# The base image already ships FrankenPHP and the standard PHP extensions. We
+# only add the extensions this application needs (image handling, EXIF data,
+# ZIP archives, MySQL, bcmath) and switch to the production php.ini.
+FROM dunglas/frankenphp:1-php8.4-bookworm AS base
+
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        ca-certificates \
+        curl \
+        git \
+        unzip \
+        libcap2-bin \
+        libicu-dev \
+        libzip-dev \
+        libpng-dev \
+        libjpeg62-turbo-dev \
+        libfreetype6-dev \
+        libwebp-dev; \
+    rm -rf /var/lib/apt/lists/*; \
+    if ! command -v install-php-extensions > /dev/null 2>&1; then \
+        curl -fsSL https://raw.githubusercontent.com/mlocati/docker-php-extension-installer/master/install-php-extensions -o /usr/local/bin/install-php-extensions; \
+        chmod +x /usr/local/bin/install-php-extensions; \
+    fi; \
+    install-php-extensions intl zip gd exif pdo_mysql bcmath; \
+    cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
+
+# Upload limits. The app accepts photo batches, so the request body may be
+# larger than a single photo: post_max_size must stay above upload_max_filesize
+# (plus the multipart overhead of the remaining files).
+RUN printf '%s\n' \
+        'upload_max_filesize = 25M' \
+        'post_max_size = 128M' \
+        'max_file_uploads = 50' \
+        'memory_limit = 512M' \
+        'max_execution_time = 300' \
+        > "$PHP_INI_DIR/conf.d/zz-photo-backup.ini"
+
+WORKDIR /app
+
+# =============================================================================
+# Assets: compile the front-end with Vite (public/build is git-ignored)
+# =============================================================================
+FROM node:22-bookworm-slim AS assets
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY resources ./resources
+COPY public ./public
+COPY vite.config.js ./
+RUN npm run build
+
+# =============================================================================
+# Dependencies: production Composer install + cached Laravel artifacts
+# =============================================================================
+FROM base AS dependencies
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# --no-scripts is required: the "post-autoload-dump" hook runs
+# `php artisan package:discover`, but artisan does not exist yet at this point
+# (only composer.json / composer.lock have been copied). Discovery happens
+# further down, once the full source tree is in place.
+COPY composer.json composer.lock ./
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --no-progress \
+    --no-scripts \
+    --optimize-autoloader \
+    --prefer-dist
+
+COPY . .
+
+# public/build is rebuilt by the "assets" stage, so drop the copy that came in
+# with the source tree to keep the image deterministic.
+RUN set -eux; \
+    rm -rf public/build; \
+    mkdir -p \
+        storage/framework/cache \
+        storage/framework/sessions \
+        storage/framework/views \
+        bootstrap/cache; \
+    composer dump-autoload --no-dev --classmap-authoritative; \
+    php artisan event:cache; \
+    php artisan view:cache
+
+# =============================================================================
+# Runtime: FrankenPHP serving the application
+# =============================================================================
+FROM base AS runtime
+
+ENV PORT=80 \
+    APP_ENV=production \
+    APP_DEBUG=false \
+    LOG_CHANNEL=stderr \
+    SESSION_DRIVER=database \
+    CACHE_STORE=database \
+    QUEUE_CONNECTION=sync
+
+COPY --from=dependencies --chown=www-data:www-data /app /app
+COPY --from=assets --chown=www-data:www-data /app/public/build /app/public/build
+COPY --chown=www-data:www-data Caddyfile /etc/frankenphp/Caddyfile
+
+# The container runs as www-data, so the process needs the capability to bind
+# the HTTP port and the writable directories it needs.
+RUN set -eux; \
+    setcap CAP_NET_BIND_SERVICE=+eip /usr/local/bin/frankenphp; \
+    mkdir -p \
+        storage/app/public \
+        storage/app/private \
+        storage/framework/cache \
+        storage/framework/sessions \
+        storage/framework/views \
+        bootstrap/cache; \
+    chown -R www-data:www-data /config/caddy /data/caddy; \
+    chown -R www-data:www-data storage bootstrap/cache
+
+USER www-data
+
+EXPOSE 80
+
+CMD ["frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile"]

@@ -19,6 +19,22 @@ return [
     'local_mirror_disk' => env('PHOTOS_LOCAL_MIRROR_DISK', 'local'),
 
     /*
+    |--------------------------------------------------------------------------
+    | Photo disk
+    |--------------------------------------------------------------------------
+    |
+    | The disk that stores the photo originals, the generated thumbnails and
+    | the profile pictures. It defaults to the local "public" disk, which is
+    | what local development uses. On serverless platforms (Vercel) the
+    | container filesystem is ephemeral, so this has to point at a durable
+    | bucket instead (e.g. "s3"). Every file is still streamed through the
+    | application, so the bucket stays private.
+    |
+    */
+
+    'photo_disk' => env('PHOTOS_DISK') ?: 'public',
+
+    /*
     | Maximum size of a single uploaded photo, in megabytes.
     */
     'max_upload_mb' => env('PHOTOS_MAX_UPLOAD_MB', 20),

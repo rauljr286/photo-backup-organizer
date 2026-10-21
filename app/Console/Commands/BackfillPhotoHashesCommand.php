@@ -5,7 +5,6 @@ namespace App\Console\Commands;
 use App\Models\Photo;
 use App\Services\PhotoStorageService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 class BackfillPhotoHashesCommand extends Command
@@ -38,17 +37,8 @@ class BackfillPhotoHashesCommand extends Command
 
         $pending->chunkById(100, function ($photosChunk) use ($photos, $bar, &$hashed, &$failed) {
             foreach ($photosChunk as $photo) {
-                $absolutePath = Storage::disk('public')->path($photo->file_path);
-
-                if (! file_exists($absolutePath)) {
-                    $failed++;
-                    $bar->advance();
-
-                    continue;
-                }
-
                 try {
-                    $hash = $photos->hashFile($absolutePath);
+                    $hash = $photos->hashStoredFile($photos->photoDisk(), $photo->file_path);
 
                     if ($hash === '') {
                         $failed++;

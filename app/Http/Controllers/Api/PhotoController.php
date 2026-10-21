@@ -108,13 +108,15 @@ class PhotoController extends Controller
     {
         $this->authorizePhoto($request, $photo);
 
-        if (! Storage::disk('public')->exists($photo->file_path)) {
+        $disk = config('photobackup.photo_disk');
+
+        if (! Storage::disk($disk)->exists($photo->file_path)) {
             abort(404, 'Photo file not found on disk.');
         }
 
         $download = $request->query('download') === '1';
 
-        return Storage::disk('public')->response(
+        return Storage::disk($disk)->response(
             $photo->file_path,
             basename($photo->original_filename),
             [

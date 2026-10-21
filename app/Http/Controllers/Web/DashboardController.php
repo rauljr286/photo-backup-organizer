@@ -245,7 +245,7 @@ class DashboardController extends Controller
 
     /**
      * Upload a new profile picture. The image is centre-cropped to a square and
-     * resized to a 256px avatar stored on the public disk.
+     * resized to a 256px avatar stored on the photo disk.
      */
     public function updateAvatar(Request $request): RedirectResponse
     {
@@ -260,9 +260,10 @@ class DashboardController extends Controller
 
         $user = $request->user();
         $file = $request->file('avatar');
+        $disk = config('photobackup.photo_disk');
 
         if (filled($user->avatar_path)) {
-            Storage::disk('public')->delete($user->avatar_path);
+            Storage::disk($disk)->delete($user->avatar_path);
         }
 
         $user->avatar_path = $this->storeAvatar($file, $user->id);
@@ -312,7 +313,7 @@ class DashboardController extends Controller
         imagedestroy($avatar);
 
         $path = 'avatars/'.$userId.'-'.Str::random(20).'.png';
-        Storage::disk('public')->put($path, $data);
+        Storage::disk(config('photobackup.photo_disk'))->put($path, $data);
 
         return $path;
     }

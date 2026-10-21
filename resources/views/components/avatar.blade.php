@@ -2,7 +2,7 @@
 
 @php
     $url = $user->avatarUrl()
-        && \Illuminate\Support\Facades\Storage::disk('public')->exists($user->avatar_path)
+        && \Illuminate\Support\Facades\Storage::disk(config('photobackup.photo_disk'))->exists($user->avatar_path)
         ? $user->avatarUrl()
         : null;
 @endphp
