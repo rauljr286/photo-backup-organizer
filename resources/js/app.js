@@ -1325,9 +1325,10 @@ function initUserMenu() {
             setOpen(menu, next);
         });
 
-        // Tapping any menu item dismisses the menu.
-        panel.addEventListener('click', () => {
-            setOpen(menu, false);
+        // Following a link dismisses the menu; the theme toggle and the
+        // sign-out button intentionally keep it open.
+        panel.addEventListener('click', (e) => {
+            if (e.target.closest('a')) setOpen(menu, false);
         });
     });
 
