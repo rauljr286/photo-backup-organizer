@@ -224,6 +224,25 @@ class PhotoTest extends TestCase
             ->assertDontSee('Please type DELETE to confirm.');
     }
 
+    public function test_the_archive_page_can_select_photos_for_a_bulk_restore(): void
+    {
+        $photo = $this->uploadFor($this->owner);
+        $this->actingAs($this->owner)->deleteJson("/photos/{$photo->id}");
+
+        $response = $this->actingAs($this->owner)->get('/archive');
+
+        $response->assertOk()
+            // The card is selectable through the checkbox/long press; the
+            // check button in the corner was removed from every card.
+            ->assertSee('js-select-photo', false)
+            ->assertDontSee('photo-card__pick', false)
+            // The bulk bar restores the selection.
+            ->assertSee('id="bulk-bar"', false)
+            ->assertSee('id="restore-selected"', false)
+            // The URL the bulk bar posts to.
+            ->assertSee('data-restore-url="'.route('photos.unarchive', $photo).'"', false);
+    }
+
     public function test_after_unarchiving_the_archive_page_is_clean(): void
     {
         $photo = $this->uploadFor($this->owner);

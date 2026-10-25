@@ -22,6 +22,19 @@ class PhotoStorageService
 
     public const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
 
+    /**
+     * The reasons an upload can be refused. Both upload flows (the classic
+     * server-side upload and the direct upload to the bucket) use these, so a
+     * photo is always refused for the same reason.
+     */
+    public const ERROR_UNSUPPORTED_FORMAT = 'Unsupported format: only JPG, PNG, WebP and GIF images are allowed.';
+
+    public const ERROR_CORRUPTED = 'The file is corrupted or is not a valid image.';
+
+    public const ERROR_QUOTA = 'Storage quota is full; free up space before uploading more photos.';
+
+    public const ERROR_DUPLICATE = 'This photo is already backed up.';
+
     protected string $fallbackCloudDisk;
 
     public function __construct()
@@ -52,18 +65,36 @@ class PhotoStorageService
 
         $maxMb = (int) config('photobackup.max_upload_mb', 20);
         if ($file->getSize() > $maxMb * 1024 * 1024) {
-            return "File too large: max {$maxMb}MB per photo.";
+            return self::tooLargeMessage($maxMb);
         }
         $extension = strtolower($file->getClientOriginalExtension());
         if (! in_array($extension, self::ALLOWED_EXTENSIONS, true)) {
-            return 'Unsupported format: only JPG, PNG, WebP and GIF images are allowed.';
+            return self::ERROR_UNSUPPORTED_FORMAT;
         }
         $info = @getimagesize($file->getPathname());
         if ($info === false) {
-            return 'The file is corrupted or is not a valid image.';
+            return self::ERROR_CORRUPTED;
         }
 
         return null;
+    }
+
+    /**
+     * The message shown when a photo is larger than the configured maximum.
+     */
+    public static function tooLargeMessage(int $maxMb): string
+    {
+        return "File too large: max {$maxMb}MB per photo.";
+    }
+
+    /**
+     * The path a photo of the given user is stored at. The name is always
+     * generated on the server, so the name of the uploaded file can never
+     * influence where a photo ends up.
+     */
+    public function finalPathFor(User $user, string $extension): string
+    {
+        return "photos/{$user->id}/".Str::uuid().'.'.ltrim($extension, '.');
     }
 
     public function store(UploadedFile $file, User $user, ?Album $album, ?string $altText = null, bool $private = false): Photo
@@ -74,7 +105,7 @@ class PhotoStorageService
         }
 
         if (! $user->hasStorageFor($file->getSize())) {
-            throw new \RuntimeException('Storage quota is full; free up space before uploading more photos.');
+            throw new \RuntimeException(self::ERROR_QUOTA);
         }
 
         $hash = $this->hashFile($file->getPathname());
@@ -83,15 +114,51 @@ class PhotoStorageService
         $name = Str::uuid().'.'.$extension;
         $path = $file->storeAs($directory, $name, $this->photoDisk());
 
+        return $this->registerStoredFile(
+            path: $path,
+            user: $user,
+            album: $album,
+            altText: $altText,
+            private: $private,
+            originalFilename: $file->getClientOriginalName(),
+            sizeBytes: $file->getSize(),
+            mimeType: $file->getMimeType(),
+            fileHash: $hash,
+            takenAt: $this->readTakenAt($file->getPathname()),
+        );
+    }
+
+    /**
+     * Register a file that already lives on the photo disk as a photo of the
+     * given user: the row is created, the album is attached and the thumbnail
+     * is generated.
+     *
+     * Both upload flows end up here, so a photo always looks the same, no
+     * matter whether the file travelled through the server or was uploaded
+     * straight to the bucket.
+     */
+    public function registerStoredFile(
+        string $path,
+        User $user,
+        ?Album $album = null,
+        ?string $altText = null,
+        bool $private = false,
+        ?string $originalFilename = null,
+        ?int $sizeBytes = null,
+        ?string $mimeType = null,
+        ?string $fileHash = null,
+        ?Carbon $takenAt = null,
+        array|string|null $tags = null,
+    ): Photo {
         $photo = new Photo([
             'user_id' => $user->id,
             'file_path' => $path,
-            'original_filename' => $file->getClientOriginalName(),
-            'file_hash' => $hash,
+            'original_filename' => $originalFilename ?: basename($path),
+            'file_hash' => $fileHash,
             'alt_text' => trim((string) $altText) !== '' ? trim((string) $altText) : null,
-            'taken_at' => $this->readTakenAt($file->getPathname()),
-            'size_bytes' => $file->getSize(),
-            'mime_type' => $file->getMimeType(),
+            'taken_at' => $takenAt,
+            'size_bytes' => $sizeBytes ?? 0,
+            'mime_type' => $mimeType,
             'is_private' => $private,
         ]);
         $photo->save();
@@ -100,9 +167,33 @@ class PhotoStorageService
             $photo->albums()->attach($album);
         }
 
+        $normalizedTags = $this->normalizeTags($tags);
+
+        if ($normalizedTags !== []) {
+            $photo->tags = $normalizedTags;
+            $photo->save();
+        }
+
         $this->generateThumbnail($photo);
 
         return $photo;
+    }
+
+    /**
+     * The photo of this user with exactly the same content, if there is one.
+     * Private photos are kept apart from the normal library.
+     */
+    public function findDuplicate(User $user, string $hash, bool $private): ?Photo
+    {
+        if ($hash === '') {
+            return null;
+        }
+
+        return Photo::query()
+            ->where('user_id', $user->id)
+            ->where('is_private', $private)
+            ->where('file_hash', $hash)
+            ->first();
     }
 
     /**
@@ -142,7 +233,7 @@ class PhotoStorageService
                 $failed[] = [
                     'key' => $key,
                     'original_filename' => $originalName,
-                    'error' => 'Storage quota is full; free up space before uploading more photos.',
+                    'error' => self::ERROR_QUOTA,
                 ];
 
                 continue;
@@ -150,17 +241,11 @@ class PhotoStorageService
 
             $hash = $this->hashFile($file->getPathname());
 
-            $existing = Photo::query()
-                ->where('user_id', $user->id)
-                ->where('is_private', $private)
-                ->where('file_hash', $hash)
-                ->first();
-
-            if ($existing !== null) {
+            if ($this->findDuplicate($user, $hash, $private) !== null) {
                 $duplicates[] = [
                     'key' => $key,
                     'original_filename' => $originalName,
-                    'error' => 'This photo is already backed up.',
+                    'error' => self::ERROR_DUPLICATE,
                 ];
 
                 continue;
@@ -404,7 +489,7 @@ class PhotoStorageService
         $generated = LocalFileCopy::withLocalCopy(
             $disk,
             $photo->file_path,
-            function (string $source) use ($photo, $disk, $relativePath): ?string {
+            function (string $source) use ($disk, $relativePath): ?string {
                 if (! is_file($source)) {
                     return null;
                 }
@@ -678,7 +763,7 @@ class PhotoStorageService
     /**
      * Parse the EXIF capture date (if any) from a photo file.
      */
-    protected function readTakenAt(string $path): ?Carbon
+    public function readTakenAt(string $path): ?Carbon
     {
         $exif = @exif_read_data($path, 'EXIF');
 
@@ -703,7 +788,7 @@ class PhotoStorageService
      * @param  array<int, string>|string|null  $tags
      * @return array<int, string>
      */
-    protected function normalizeTags(array|string|null $tags): array
+    public function normalizeTags(array|string|null $tags): array
     {
         if ($tags === null) {
             return [];

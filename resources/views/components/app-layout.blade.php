@@ -28,13 +28,17 @@
                     <x-nav-tabs></x-nav-tabs>
                 </div>
 
-                @php($account = config('navigation.account'))
+                @php
+                    $account = config('navigation.account');
+                @endphp
                 <div class="topbar__account">
                     <div class="user-menu" data-user-menu>
                         <button type="button" class="topbar__user user-menu__trigger" data-user-menu-trigger
                                 aria-haspopup="true" aria-expanded="false" aria-controls="user-menu-panel" aria-label="Account menu">
-                            <span class="avatar avatar--sm" role="img" aria-label="Signed in as {{ auth()->user()->name }}">
-                                <span class="avatar__initials" aria-hidden="true">{{ auth()->user()->initials() }}</span>
+                            <span class="topbar__user-avatar" aria-hidden="true">
+                                <span class="avatar avatar--sm">
+                                    <span class="avatar__initials">{{ auth()->user()->initials() }}</span>
+                                </span>
                             </span>
                             <svg class="user-menu__chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                                 <polyline points="6 9 12 15 18 9"></polyline>

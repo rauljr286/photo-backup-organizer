@@ -1,6 +1,10 @@
-@props(['albumId' => null, 'url' => null])
+@props(['albumId' => null, 'url' => null, 'private' => false])
 
-<section class="dropzone" id="upload" data-upload-zone data-url="{{ $url ?? route('photos.store') }}" data-album="{{ $albumId }}" aria-labelledby="upload-heading">
+@php
+    $directUpload = \App\Support\DirectUpload::isEnabled();
+@endphp
+
+<section class="dropzone" id="upload" data-upload-zone data-url="{{ $url ?? route('photos.store') }}" data-album="{{ $albumId }}" data-private="{{ $private ? '1' : '0' }}" data-direct-upload="{{ $directUpload ? '1' : '0' }}" data-prepare-url="{{ $directUpload ? route('photos.uploads.prepare') : '' }}" data-complete-url="{{ $directUpload ? route('photos.uploads.complete') : '' }}" data-max-upload-mb="{{ config('photobackup.max_upload_mb', 20) }}" aria-labelledby="upload-heading">
     <h2 class="visually-hidden" id="upload-heading">Upload photos</h2>
 
     <div class="dropzone__area" id="drop-target" role="button" tabindex="0" aria-label="Upload photos. Press Enter or Space to choose files, or drag and drop photos here.">

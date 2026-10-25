@@ -115,9 +115,11 @@
                             <div class="profile__row"><dt>Member since</dt><dd>{{ $user->created_at?->format('F j, Y') }}</dd></div>
                         </dl>
 
-                        <p class="profile__note">
-                            Archived photos stay safely stored until you choose to restore them. You can request full account deletion in the Security tab at any time.
-                        </p>
+                    </section>
+                @endif
+
+                @if ($activeTab === 'security')
+                    <section class="profile__panel" role="tabpanel" aria-labelledby="tab-security">
                     </section>
                 @endif
 
@@ -293,9 +295,6 @@
                             </div>
                         @endif
 
-                        <p class="profile__note">
-                            <a class="profile__link" href="{{ route('private') }}" data-private-gate>Open the private gallery</a> to upload and view your private photos.
-                        </p>
                     </section>
                 @endif
             </div>

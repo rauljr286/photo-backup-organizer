@@ -13,7 +13,9 @@
  *   - active : route name patterns passed to request()->routeIs()
  *   - icon    : inline SVG markup drawn inside a 24x24 viewBox
  *   - mobile  : 'tab' (bottom bar) or 'more' (inside the More popover)
- *   - desktop : set false to omit from the desktop pill nav (default true)
+ *   - desktop : set false to omit from the desktop pill nav (default true).
+ *               Only Private uses this: it stays out of every bottom bar
+ *               and is reached from the profile picture in the top bar.
  *   - badge   : optional 'archived' to show the archived-photo count
  *   - mobile_label : optional phone-only bottom-bar label (falls back to label)
  *   - phone   : optional 'tab'/'more' role for the phone (<=767.98px) bottom
@@ -46,7 +48,7 @@ return [
             'route' => 'archive',
             'active' => ['archive'],
             'mobile' => 'tab',
-            'phone' => 'more',
+            'phone' => 'tab',
             'badge' => 'archived',
             'icon' => '<rect x="2" y="3" width="20" height="5" rx="1"></rect><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"></path><path d="M10 12h4"></path>',
         ],
@@ -63,7 +65,7 @@ return [
             'label' => 'Insights',
             'route' => 'insights',
             'active' => ['insights'],
-            'mobile' => 'more',
+            'mobile' => 'tab',
             'phone' => 'tab',
             'icon' => '<path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5a6 6 0 0 0-12 0c0 1 .2 2.2 1.5 3.5.8.8 1.3 1.5 1.5 2.5"></path><path d="M9 18h6"></path><path d="M10 22h4"></path>',
         ],
@@ -71,7 +73,8 @@ return [
             'label' => 'Cleanup',
             'route' => 'cleanup',
             'active' => ['cleanup'],
-            'mobile' => 'more',
+            'mobile' => 'tab',
+            'phone' => 'tab',
             'icon' => '<path d="M12 2v9"></path><path d="M8 11h8"></path><path d="M8 11 5 21h14l-3-10Z"></path><path d="M10 11l-1 10"></path><path d="M14 11l1 10"></path>',
         ],
     ],

@@ -9,6 +9,11 @@
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 const flashRegion = document.getElementById('flash-region');
 
+/* True while the grid is in selection mode: photos are then ticked with a
+   tap instead of opened. Set by the long press handler, cleared when the
+   last photo is deselected. */
+let selectionMode = false;
+
 function postJson(url, method = 'POST', body = {}) {
     return fetch(url, {
         method,
@@ -93,6 +98,32 @@ function showToast(message, { actionLabel, actionUrl, actionMethod = 'POST', onA
 const UPLOAD_CHUNK_SIZE = 10;
 const UPLOAD_CHUNK_BYTES = 96 * 1024 * 1024;
 
+/* The formats the server accepts. The browser checks them as well, so a file
+ * that would be refused anyway is reported without a round trip. */
+const UPLOAD_ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+
+/* How many photos are sent to the bucket at the same time when the photos are
+ * uploaded straight to it. */
+const DIRECT_UPLOAD_CONCURRENCY = 3;
+
+function checkUploadType(file) {
+    const extension = String(file.name || '').split('.').pop().toLowerCase();
+
+    if (!UPLOAD_ALLOWED_EXTENSIONS.includes(extension)) {
+        return 'Unsupported format: only JPG, PNG, WebP and GIF images are allowed.';
+    }
+
+    return null;
+}
+
+function checkUploadSize(file, maxUploadMb) {
+    if (maxUploadMb > 0 && file.size > maxUploadMb * 1024 * 1024) {
+        return `File too large: max ${maxUploadMb}MB per photo.`;
+    }
+
+    return null;
+}
+
 function initUploads() {
     const zones = document.querySelectorAll('[data-upload-zone]');
     if (!zones.length) return;
@@ -104,6 +135,13 @@ function initUploads() {
         const list = zone.querySelector('#upload-list');
         const albumId = zone.dataset.album || '';
         const url = zone.dataset.url;
+        const directUpload = zone.dataset.directUpload === '1'
+            && !!zone.dataset.prepareUrl
+            && !!zone.dataset.completeUrl;
+        const prepareUrl = zone.dataset.prepareUrl || '';
+        const completeUrl = zone.dataset.completeUrl || '';
+        const isPrivate = zone.dataset.private === '1';
+        const maxUploadMb = Number(zone.dataset.maxUploadMb || 20);
 
         if (!target || !input || !picker || !list) return;
 
@@ -195,6 +233,11 @@ function initUploads() {
         }
 
         async function drain() {
+            if (directUpload) {
+                await drainDirect();
+                return;
+            }
+
             if (state.draining) return;
             state.draining = true;
 
@@ -309,6 +352,145 @@ function initUploads() {
                 });
 
                 xhr.send(formData);
+            });
+        }
+
+        /* ---------------- Direct (presigned) uploads ---------------- */
+
+        /* The photo is sent straight to the bucket: the server hands out a
+         * signed URL for one file, the browser PUTs the file to it and then
+         * tells the server the upload is finished. A few files travel at the
+         * same time, so a large selection does not take forever. */
+        async function drainDirect() {
+            if (state.draining) return;
+            state.draining = true;
+
+            try {
+                const workers = [];
+
+                for (let i = 0; i < DIRECT_UPLOAD_CONCURRENCY; i++) {
+                    workers.push(directWorker());
+                }
+
+                await Promise.all(workers);
+            } finally {
+                state.draining = false;
+            }
+
+            // A photo that was queued while the workers were finishing is
+            // picked up by a fresh round, so nothing is left behind.
+            if (state.queue.length) {
+                drainDirect();
+                return;
+            }
+
+            if (state.batch) showSummary(state.batch);
+        }
+
+        async function directWorker() {
+            while (state.queue.length) {
+                const entry = state.queue.shift();
+                await uploadDirect(entry);
+            }
+        }
+
+        async function uploadDirect(entry) {
+            const file = entry.file;
+
+            const typeError = checkUploadType(file);
+
+            if (typeError) {
+                settleEntry(entry, false, typeError);
+                return;
+            }
+
+            const sizeError = checkUploadSize(file, maxUploadMb);
+
+            if (sizeError) {
+                settleEntry(entry, false, sizeError);
+                return;
+            }
+
+            let prepared = null;
+
+            try {
+                prepared = await prepareDirectUpload(entry);
+            } catch (err) {
+                settleEntry(entry, false, err.message);
+                return;
+            }
+
+            try {
+                await putDirectUpload(prepared, file, entry);
+            } catch (err) {
+                settleEntry(entry, false, err.message);
+                return;
+            }
+
+            try {
+                const data = await postJson(completeUrl, 'POST', { upload_id: prepared.upload_id });
+                const photo = (data.uploaded || [])[0];
+
+                if (photo) {
+                    settleEntry(entry, true);
+                    refreshGrid([photo]);
+                    return;
+                }
+
+                const failure = (data.failed || [])[0] || (data.duplicates || [])[0];
+                settleEntry(entry, false, failure?.error || data.message || 'Upload failed.');
+            } catch (err) {
+                settleEntry(entry, false, err.message);
+            }
+        }
+
+        function prepareDirectUpload(entry) {
+            return postJson(prepareUrl, 'POST', {
+                filename: entry.file.name,
+                size: entry.file.size,
+                mime_type: entry.file.type || null,
+                album_id: albumId ? Number(albumId) : null,
+                private: isPrivate,
+            });
+        }
+
+        function putDirectUpload(prepared, file, entry) {
+            return new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open(prepared.method || 'PUT', prepared.url);
+
+                const headers = prepared.headers || {};
+                Object.keys(headers).forEach((name) => {
+                    try {
+                        xhr.setRequestHeader(name, headers[name]);
+                    } catch (e) {
+                        /* a header the browser refuses is no reason to fail the upload */
+                    }
+                });
+
+                xhr.upload.addEventListener('progress', (e) => {
+                    if (!e.lengthComputable) return;
+                    entry.setProgress(Math.round((e.loaded / e.total) * 100));
+                });
+
+                xhr.addEventListener('load', () => {
+                    if (xhr.status >= 200 && xhr.status < 300) {
+                        resolve();
+                        return;
+                    }
+
+                    reject(new Error(`The photo could not be sent to the storage bucket (HTTP ${xhr.status}).`));
+                });
+
+                xhr.addEventListener('error', () => {
+                    reject(new Error('Upload failed. Check your connection and try again.'));
+                });
+
+                xhr.addEventListener('abort', () => {
+                    reject(new Error('Upload failed. Please try again.'));
+                });
+
+                xhr.send(file);
             });
         }
 
@@ -494,7 +676,6 @@ function photoCardHtml(photo) {
     const flag = photo.backed_up === false
         ? '<span class="photo-card__flag" title="Not backed up to cloud yet">Cloud backup pending</span>'
         : '';
-
     return `
     <figure class="photo-card" data-photo-id="${photo.id}" data-archive-url="/photos/${photo.id}" data-restore-url="/photos/${photo.id}/unarchive">
       <a class="photo-card__media" href="/photos/${photo.id}" aria-label="Open ${description}">
@@ -621,8 +802,17 @@ function initBulkSelect() {
     let hideTimer = null;
 
     const update = () => {
-        const boxes = getGrid() ? getGrid().querySelectorAll('.js-select-photo:checked') : [];
-        const n = boxes.length;
+        const boxes = getGrid() ? getGrid().querySelectorAll('.js-select-photo') : [];
+        let n = 0;
+
+        boxes.forEach((box) => {
+            const card = box.closest('.photo-card');
+
+            card?.classList.toggle('is-selected', box.checked);
+
+            if (box.checked) n++;
+        });
+
         count.textContent = n;
         window.clearTimeout(hideTimer);
 
@@ -633,6 +823,7 @@ function initBulkSelect() {
             bar.classList.add('is-visible');
         } else {
             bar.classList.remove('is-visible');
+            selectionMode = false;
             hideTimer = window.setTimeout(() => {
                 if (!bar.classList.contains('is-visible')) bar.hidden = true;
             }, 250);
@@ -688,6 +879,33 @@ function initBulkSelect() {
         }
     });
 
+    /* The archive restores the selected photos with one request each, the
+       same way the single "Restore" button of the card does it. */
+    document.getElementById('restore-selected')?.addEventListener('click', () => {
+        const boxes = Array.from(getGrid()?.querySelectorAll('.js-select-photo:checked') || []);
+        if (!boxes.length) return;
+
+        const cards = boxes.map((box) => box.closest('.photo-card')).filter(Boolean);
+        const urls = cards.map((card) => card.dataset.restoreUrl).filter(Boolean);
+        if (!urls.length) return;
+
+        const button = document.getElementById('restore-selected');
+        button.disabled = true;
+        button.classList.add('is-loading');
+
+        Promise.all(urls.map((url) => postJson(url, 'POST')))
+            .then(() => {
+                cards.forEach((card) => card.remove());
+                clear();
+                showToast(`${cards.length} photo(s) restored.`);
+            })
+            .catch((err) => showToast(err.message, { tone: 'error' }))
+            .finally(() => {
+                button.disabled = false;
+                button.classList.remove('is-loading');
+            });
+    });
+
     document.getElementById('edit-selected')?.addEventListener('click', () => {
         const boxes = Array.from(getGrid()?.querySelectorAll('.js-select-photo:checked') || []);
         if (!boxes.length) return;
@@ -722,6 +940,114 @@ function initBulkSelect() {
                 })
                 .catch((err) => showToast(err.message, { tone: 'error' }));
         };
+    });
+}
+
+/* ---------------- Long press to select ---------------- */
+
+/* A photo is selected with the check button in the corner of the thumbnail,
+   with the checkbox in the card footer, or with a long press. Half a second
+   on a card enters the selection mode and ticks that photo, a tap in
+   selection mode ticks or unticks a photo, and the bulk toolbar shows up
+   with the actions for the selection. */
+
+const LONG_PRESS_MS = 450;
+const LONG_PRESS_TOLERANCE = 12;
+
+function initLongPressSelect() {
+    const grid = document.getElementById('photo-grid');
+    if (!grid) return;
+
+    // Without the bulk toolbar there is nothing to select for.
+    if (!document.getElementById('bulk-bar')) return;
+
+    let timer = null;
+    let startX = 0;
+    let startY = 0;
+    let longPressed = false;
+
+    const stopTimer = () => {
+        window.clearTimeout(timer);
+        timer = null;
+    };
+
+    const cardOf = (target) => target?.closest?.('.photo-card') || null;
+
+    const setSelected = (card, selected) => {
+        const box = card?.querySelector('.js-select-photo');
+        if (!box || box.checked === selected) return;
+
+        box.checked = selected;
+        box.dispatchEvent(new Event('change', { bubbles: true }));
+    };
+
+        // Check button removed on mobile - selection via bulk controls/long press only.
+
+    grid.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return;
+
+        const card = cardOf(event.target);
+        if (!card || !card.querySelector('.js-select-photo')) return;
+
+        longPressed = false;
+        startX = event.clientX;
+        startY = event.clientY;
+
+        stopTimer();
+        timer = window.setTimeout(() => {
+            timer = null;
+            longPressed = true;
+            selectionMode = true;
+            setSelected(card, true);
+            navigator.vibrate?.(15);
+        }, LONG_PRESS_MS);
+    });
+
+    // A press that turns into a scroll or a drag is not a long press.
+    grid.addEventListener('pointermove', (event) => {
+        if (!timer) return;
+
+        if (Math.abs(event.clientX - startX) > LONG_PRESS_TOLERANCE
+            || Math.abs(event.clientY - startY) > LONG_PRESS_TOLERANCE) {
+            stopTimer();
+        }
+    });
+
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((type) => {
+        grid.addEventListener(type, stopTimer);
+    });
+
+        // The click that ends a long press must not open the photo, and in
+        // selection mode a plain tap ticks the photo instead of opening it.
+        grid.addEventListener('click', (event) => {
+            if (longPressed) {
+                longPressed = false;
+                event.preventDefault();
+                event.stopPropagation();
+                return;
+            }
+
+            // A button in the card keeps working while the selection mode is
+            // on: the "Restore" button of the archive card is a form.
+            if (event.target.closest?.('form')) return;
+
+            if (!selectionMode) return;
+
+            const card = cardOf(event.target);
+            if (!card) return;
+
+            const box = card.querySelector('.js-select-photo');
+            if (!box) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            setSelected(card, !box.checked);
+        }, true);
+
+    // Keep the browser's own long press menu (callout, download image) out
+    // of the way once the gesture is used for selecting.
+    grid.addEventListener('contextmenu', (event) => {
+        if (longPressed || selectionMode) event.preventDefault();
     });
 }
 
@@ -1653,7 +1979,7 @@ function initDownloadSelected() {
 
     button.addEventListener('click', () => {
         const grid = document.getElementById('photo-grid');
-        const boxes = Array.from(getGrid()?.querySelectorAll('.js-select-photo:checked') || []);
+        const boxes = Array.from(grid?.querySelectorAll('.js-select-photo:checked') || []);
 
         if (!boxes.length) {
             showToast('Select at least one photo to download.', { tone: 'warning' });
@@ -2123,6 +2449,150 @@ function initOfflineBanner() {
     window.addEventListener('offline', update);
 }
 
+/* ---------------- Bottom navigation height ---------------- */
+
+/* The bottom navigation is fixed to the bottom of the screen, so anything
+   that floats above it (the bulk action bar) has to know how tall it is.
+   The height is not a constant: the labels, the font size and the safe area
+   change it, so it is measured and published as a CSS variable. */
+
+function initBottomNavOffset() {
+    const root = document.documentElement;
+
+    const update = () => {
+        let height = 0;
+
+        document.querySelectorAll('.bottom-nav').forEach((nav) => {
+            if (window.getComputedStyle(nav).display === 'none') return;
+
+            const rect = nav.getBoundingClientRect();
+
+            if (rect.height > 0) height = Math.max(height, rect.height);
+        });
+
+        root.style.setProperty('--bottom-nav-h', `${Math.ceil(height)}px`);
+    };
+
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+
+    if (window.ResizeObserver) {
+        const observer = new ResizeObserver(update);
+
+        document.querySelectorAll('.bottom-nav').forEach((nav) => observer.observe(nav));
+    }
+}
+
+/* ---------------- Infinite scroll ---------------- */
+
+/* The photo grid no longer shows numbered pages: a sentinel below the grid
+   asks the server for the next page whenever it scrolls into view, so the
+   library keeps growing as the user scrolls down. */
+
+function initInfiniteScroll() {
+    const sentinel = document.querySelector('[data-infinite-scroll]');
+    const grid = document.getElementById('photo-grid');
+    if (!sentinel || !grid) return;
+
+    let nextPage = Number(sentinel.dataset.nextPage) || 2;
+    let hasMore = sentinel.dataset.hasMore !== 'false';
+    let loading = false;
+    let observer = null;
+
+    const status = sentinel.querySelector('.grid-sentinel__text');
+
+    /* Keep the filters that are currently applied and ask for the page we
+       need next. The album id lives in the page url, so it is passed along
+       explicitly for the album grid. */
+    const buildUrl = (page) => {
+        const url = new URL(sentinel.dataset.pageUrl, window.location.origin);
+        const params = new URLSearchParams(window.location.search);
+
+        params.forEach((value, key) => {
+            if (key === 'page') return;
+            url.searchParams.set(key, value);
+        });
+
+        if (sentinel.dataset.album) url.searchParams.set('album', sentinel.dataset.album);
+        url.searchParams.set('page', String(page));
+
+        return url.toString();
+    };
+
+    const loadMore = async () => {
+        if (loading || !hasMore) return;
+
+        loading = true;
+        sentinel.classList.add('is-loading');
+        sentinel.classList.remove('is-error');
+
+        try {
+            const response = await fetch(buildUrl(nextPage), {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+
+            if (response.status === 401 || response.status === 419) {
+                hasMore = false;
+                observer?.unobserve(sentinel);
+                return;
+            }
+
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+            const data = await response.json();
+            const photos = Array.isArray(data.photos) ? data.photos : [];
+            const html = photos.map(photoCardHtml).join('');
+
+            if (html) {
+                grid.insertAdjacentHTML('beforeend', html);
+                document.querySelector('.empty-state')?.remove();
+                advanceLatestId();
+            }
+
+            hasMore = Boolean(data.has_more);
+            nextPage = Number(data.next_page) || nextPage + 1;
+            sentinel.dataset.hasMore = hasMore ? 'true' : 'false';
+            sentinel.dataset.nextPage = String(nextPage);
+
+            if (!hasMore) {
+                sentinel.classList.add('is-complete');
+                if (status) status.textContent = 'All photos loaded';
+                observer?.unobserve(sentinel);
+            }
+        } catch (error) {
+            sentinel.classList.add('is-error');
+            if (status) status.textContent = 'Could not load more photos. Tap to retry.';
+        } finally {
+            loading = false;
+            sentinel.classList.remove('is-loading');
+        }
+    };
+
+    if (!('IntersectionObserver' in window)) {
+        /* Very old browsers: fall back to loading the next page on scroll. */
+        window.addEventListener('scroll', () => {
+            const rect = sentinel.getBoundingClientRect();
+            if (rect.top < window.innerHeight + 400) loadMore();
+        }, { passive: true });
+
+        return;
+    }
+
+    observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) loadMore();
+        });
+    }, { rootMargin: '500px 0px' });
+
+    observer.observe(sentinel);
+
+    sentinel.addEventListener('click', () => {
+        if (sentinel.classList.contains('is-error')) loadMore();
+    });
+}
+
 /* ---------------- Bootstrap ---------------- */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2130,6 +2600,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initUploads();
     initUploadTab();
     initBulkSelect();
+    initLongPressSelect();
+    initInfiniteScroll();
     initDialogs();
     initPrivateGate();
     initPrivateKeypad();
@@ -2157,4 +2629,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuthCard();
     initServiceWorker();
     initOfflineBanner();
+    initBottomNavOffset();
 });

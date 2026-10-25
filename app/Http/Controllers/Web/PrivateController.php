@@ -165,4 +165,44 @@ class PrivateController extends Controller
 
         return $this->handlePhotoUpload($request, true);
     }
+
+    /**
+     * Return one page of private photos as JSON so the grid can keep loading
+     * more photos while the user scrolls instead of showing numbered pages.
+     */
+    public function page(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (! $user->hasPrivatePassword() || ! PrivateGallery::isUnlocked($request)) {
+            return response()->json([
+                'photos' => [],
+                'has_more' => false,
+                'next_page' => null,
+                'total' => 0,
+            ], 403);
+        }
+
+        $paginator = $user->privatePhotos()
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate(DashboardController::PHOTOS_PER_PAGE);
+
+        return response()->json([
+            'photos' => $paginator->getCollection()
+                ->map(fn ($photo) => [
+                    'id' => $photo->id,
+                    'url' => $photo->url(),
+                    'thumbnail_url' => $photo->thumbnailUrl(),
+                    'description' => $photo->description(),
+                    'size_bytes' => $photo->size_bytes,
+                    'taken_at' => $photo->taken_at?->toISOString(),
+                    'backed_up' => $photo->isBackedUp(),
+                ])
+                ->values(),
+            'has_more' => $paginator->hasMorePages(),
+            'next_page' => $paginator->currentPage() + 1,
+            'total' => $paginator->total(),
+        ]);
+    }
 }

@@ -4,6 +4,7 @@ use App\Http\Controllers\Web\AlbumController;
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\AvatarController;
 use App\Http\Controllers\Web\DashboardController;
+use App\Http\Controllers\Web\DirectUploadController;
 use App\Http\Controllers\Web\HomeController;
 use App\Http\Controllers\Web\InsightsController;
 use App\Http\Controllers\Web\LegalController;
@@ -34,9 +35,16 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/photos', [DashboardController::class, 'upload'])->name('photos.store');
+    Route::post('/photos/uploads/prepare', [DirectUploadController::class, 'prepareUpload'])
+        ->middleware('throttle:120,1')
+        ->name('photos.uploads.prepare');
+    Route::post('/photos/uploads/complete', [DirectUploadController::class, 'completeUpload'])
+        ->middleware('throttle:120,1')
+        ->name('photos.uploads.complete');
     Route::post('/backup', [DashboardController::class, 'backupNow'])->name('backup.now');
     Route::get('/archive', [DashboardController::class, 'archive'])->name('archive');
     Route::get('/photos/latest', [DashboardController::class, 'latest'])->name('photos.latest');
+    Route::get('/photos/page', [DashboardController::class, 'page'])->name('photos.page');
 
     Route::get('/insights', [InsightsController::class, 'show'])->name('insights');
     Route::get('/cleanup', [InsightsController::class, 'cleanup'])->name('cleanup');
@@ -47,6 +55,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/private/lock', [PrivateController::class, 'lock'])->name('private.lock');
     Route::post('/private/reset', [PrivateController::class, 'resetPassword'])->name('private.reset');
     Route::post('/private/photos', [PrivateController::class, 'upload'])->name('private.photos.store');
+    Route::get('/private/photos/page', [PrivateController::class, 'page'])->name('private.photos.page');
 
     Route::get('/settings', [DashboardController::class, 'settings'])->name('settings');
     Route::get('/profile', [DashboardController::class, 'settings'])->name('profile');

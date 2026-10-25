@@ -40,6 +40,31 @@ return [
     'max_upload_mb' => env('PHOTOS_MAX_UPLOAD_MB', 20),
 
     /*
+    |--------------------------------------------------------------------------
+    | Direct (presigned) uploads
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the browser uploads the photo straight to the bucket with a
+    | short-lived presigned URL, so the file never travels through the
+    | application server. That is only possible when the photo disk is a bucket
+    | (an S3 disk), because a local disk cannot hand out upload URLs. With the
+    | setting off, or with a local photo disk, uploads keep using the classic
+    | server-side flow.
+    |
+    | direct_upload_url_ttl: how long the presigned upload URL stays valid.
+    |
+    | pending_ttl_minutes: how long a prepared upload may wait for the browser
+    | to finish before it is considered expired and cleaned up.
+    |
+    */
+
+    'direct_upload' => (bool) env('PHOTOS_DIRECT_UPLOAD', false),
+
+    'direct_upload_url_ttl' => (int) env('PHOTOS_UPLOAD_URL_TTL', 300),
+
+    'pending_ttl_minutes' => (int) env('PHOTOS_PENDING_TTL_MINUTES', 60),
+
+    /*
     | Contact address shown in the in-app privacy policy.
     */
     'support_email' => env('PHOTOS_SUPPORT_EMAIL', 'support@example.com'),

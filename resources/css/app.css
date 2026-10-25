@@ -790,21 +790,94 @@ img {
     min-width: 0;
 }
 
+/* Quick actions (Cleanup, Archive) rendered as icon buttons on the right. */
+.topbar__action {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-on-brand);
+    text-decoration: none;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.topbar__action:hover,
+.topbar__action:focus-visible {
+    background: rgba(255, 255, 255, 0.18);
+    border-color: rgba(255, 255, 255, 0.34);
+}
+
+.topbar__action.is-active {
+    background: rgba(255, 255, 255, 0.94);
+    border-color: transparent;
+    color: #000000;
+}
+
+.topbar__action-badge {
+    position: absolute;
+    top: -0.45rem;
+    right: -0.45rem;
+    min-width: 1.2rem;
+    padding: 0 0.3rem;
+    background: var(--color-danger);
+    color: #ffffff;
+    font-size: 0.64rem;
+    line-height: 1.2rem;
+    text-align: center;
+}
+
 .topbar__user {
     display: inline-flex;
     align-items: center;
-    gap: 0.6rem;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 44px;
+    padding: 0 0.5rem 0 0.25rem;
     text-decoration: none;
     color: var(--color-on-brand);
     border-radius: 999px;
-    padding: 0.2rem 0.4rem;
     border: 1px solid rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
     transition: background-color 0.15s ease, border-color 0.15s ease;
 }
 
 .topbar__user:hover {
     background: rgba(255, 255, 255, 0.12);
     border-color: rgba(255, 255, 255, 0.34);
+}
+
+/* The account menu shows the user's initials in a small circle; it opens the
+   same dropdown everywhere. */
+.topbar__user-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    overflow: hidden;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.topbar__user-avatar .avatar {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+    color: #ffffff;
+}
+
+.topbar__user-avatar .avatar__initials {
+    font-size: 0.78rem;
+    letter-spacing: 0.04em;
 }
 
 .topbar :focus-visible {
@@ -1670,6 +1743,7 @@ img {
 }
 
 .photo-card {
+    position: relative;
     margin: 0;
     background: var(--color-surface);
     border: 1px solid var(--color-border-soft);
@@ -1824,6 +1898,50 @@ img {
     margin: 0;
     color: var(--color-muted);
     font-size: 0.9rem;
+}
+
+/* The photo grid loads more photos while the user scrolls instead of showing
+   numbered pages, so the space below the grid holds a small status line. */
+.grid-sentinel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.55rem;
+    min-height: 3.25rem;
+    margin-top: 1rem;
+    color: var(--color-muted);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.grid-sentinel__spinner {
+    width: 1.05rem;
+    height: 1.05rem;
+    flex: none;
+    border-radius: 50%;
+    border: 2px solid var(--color-primary-outline);
+    border-top-color: var(--color-primary);
+    opacity: 0;
+}
+
+.grid-sentinel.is-loading .grid-sentinel__spinner {
+    opacity: 1;
+    animation: grid-sentinel-spin 0.7s linear infinite;
+}
+
+.grid-sentinel.is-complete .grid-sentinel__spinner {
+    display: none;
+}
+
+.grid-sentinel.is-error {
+    color: var(--color-danger-text);
+    cursor: pointer;
+}
+
+@keyframes grid-sentinel-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 /* ---------- Albums ---------- */
@@ -5004,6 +5122,19 @@ img {
         position: absolute;
         top: -0.45rem;
         right: -0.6rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 1.05rem;
+        height: 1.05rem;
+        padding: 0 0.25rem;
+        border-radius: 999px;
+        background: var(--color-danger);
+        color: #ffffff;
+        font-size: 0.6rem;
+        font-weight: 800;
+        line-height: 1;
+        border: 2px solid var(--color-surface);
     }
 
     .bottom-nav__label {
@@ -5445,19 +5576,6 @@ img {
 [data-theme='dark'] .pd-page .topbar__user {
     border-color: rgba(255, 255, 255, 0.35);
     color: #ffffff;
-}
-
-[data-theme='dark'] .pd-page .topbar__user .avatar {
-    width: 32px;
-    height: 32px;
-    background: #0b1829;
-    border-color: rgba(255, 255, 255, 0.6);
-    color: #e8f0f8;
-    box-shadow: none;
-}
-
-[data-theme='dark'] .pd-page .topbar__user .avatar__initials {
-    font-size: 0.78rem;
 }
 
 /* Page layout */
@@ -6433,10 +6551,6 @@ img {
     margin-bottom: 0.75rem;
 }
 
-.private-gallery .photo-card__check {
-    display: none;
-}
-
 /* Private tab (Profile & settings) */
 
 .private-status {
@@ -6497,12 +6611,11 @@ img {
     margin-top: 1rem;
 }
 
-/* ---------- Responsive header / nav split (900px) ----------
- * Below 900px: header shows the logo + title only (no avatar, no pill nav)
- * and account actions live in the bottom-nav "More" menu. At 900px and up:
- * the pill nav and avatar return and the bottom nav is gone. A width media
- * query is used so mobile "Desktop site" (which reports ~980px) gets the
- * desktop layout automatically. */
+    /* Below 900px: header shows the logo + the profile picture (no pill nav)
+     * and the account actions live in the bottom-nav "More" menu. At 900px and
+     * up: the pill nav and avatar return and the bottom nav is gone. A width
+     * media query is used so mobile "Desktop site" (which reports ~980px) gets
+     * the desktop layout automatically. */
 
 .user-menu__divider {
     height: 1px;
@@ -6518,7 +6631,7 @@ img {
 
 @media (max-width: 899.98px) {
     .topbar__inner {
-        grid-template-columns: minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr) auto;
         gap: 0;
     }
 
@@ -6526,9 +6639,13 @@ img {
         grid-column: 1;
     }
 
-    .topbar__nav,
-    .topbar__account {
+    .topbar__nav {
         display: none;
+    }
+
+    .topbar__account {
+        display: flex;
+        grid-column: 2;
     }
 
     .app-main {
@@ -6539,6 +6656,10 @@ img {
 @media (min-width: 900px) {
     .bottom-nav {
         display: none;
+    }
+
+    .topbar__user {
+        padding: 0 0.65rem 0 0.25rem;
     }
 }
 
@@ -6600,8 +6721,30 @@ img {
         white-space: nowrap;
     }
 
+    /* The desktop account menu is hidden together with the tab nav below
+       900px; on phones the profile picture and the account menu stay
+       reachable from the right corner of the top bar (the bottom bar keeps
+       its own tabs). */
     .topbar__inner {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 0.5rem;
         padding-top: calc(0.7rem + env(safe-area-inset-top, 0px));
+    }
+
+    .topbar__account {
+        display: flex;
+        grid-column: 2;
+    }
+
+    .topbar__user {
+        min-height: 44px;
+        justify-content: center;
+        gap: 0.4rem;
+        padding: 0 0.55rem 0 0.25rem;
+    }
+
+    .topbar__brand span {
+        display: block;
     }
 
     .toast-region {
@@ -7601,6 +7744,11 @@ img {
     .bottom-nav__badge {
         top: -0.35rem;
         right: -0.5rem;
+        min-width: 1.05rem;
+        height: 1.05rem;
+        padding: 0 0.22rem;
+        font-size: 0.58rem;
+        border-width: 1.5px;
     }
 
     /* "Dashboard" is the longest label; nudge tracking in so it never
@@ -8046,27 +8194,9 @@ img {
     }
 }
 
-/* ---------------- Archive: compact meta + full-width restore ------ */
+/* ---------------- Archive: full-width restore button ---------------- */
 
 @media (max-width: 767.98px) {
-    /* Keep 2 columns (handled by the existing phone photo-grid rule). */
-    .photo-card__caption {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.1rem;
-        padding: 0.4rem 0.5rem 0.25rem;
-        font-size: 12px;
-    }
-
-    .photo-card__date {
-        font-size: 12px;
-        font-weight: 600;
-    }
-
-    .photo-card__size {
-        font-size: 11px;
-    }
-
     .photo-card__actions {
         padding: 0.4rem 0.5rem 0.5rem;
         gap: 6px;
@@ -8082,21 +8212,11 @@ img {
         width: 100%;
         min-height: var(--m-tap-secondary);
     }
-
-    .photo-card__flag {
-        font-size: 0.65rem;
-        padding: 0.15rem 0.4rem;
-    }
 }
 
-/* ---------------- Photo grids: tighter caption -------------------- */
+/* ---------------- Phone photo grid: square thumbnails ------------- */
 
 @media (max-width: 767.98px) {
-    .photo-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
-    }
-
     .photo-card {
         border-radius: var(--m-radius);
     }
@@ -8327,16 +8447,331 @@ img {
         padding: 0.35rem 0.5rem;
     }
 
-    /* Photo-card selection checkbox: keep a >=36px hit area on the label. */
-    .photo-card__check {
-        min-width: var(--m-tap-inline);
-        min-height: var(--m-tap-inline);
-        justify-content: center;
-        margin: 0;
-    }
-
     .field__checkbox {
         width: 1.25rem;
         height: 1.25rem;
+    }
+}
+
+/* ---------------- Mobile library: four photos per row ----------------
+ *
+ * On a phone the library is a thumbnail grid: four photos per row with
+ * small cards, so much more of the library fits on a screen. The cards show
+ * the photo only - the date and the size are gone, because the details live
+ * in the photo view, and a check button in the corner of the thumbnail
+ * selects the photo.
+ *
+ * This block sits at the end of the stylesheet on purpose - it is the last
+ * word on the phone layout, so no earlier rule can turn the grid back into
+ * the two-column phone grid.
+ *
+ * A phone held sideways, or a browser that reports a desktop-sized viewport
+ * ("desktop site" mode), is a touch device and gets the same treatment. */
+
+@media (max-width: 767.98px) {
+    .photo-grid,
+    .photo-grid--skeleton {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 5px;
+    }
+
+    /* Compact card: only the thumbnail is left. */
+    .photo-card {
+        border-radius: 10px;
+    }
+
+    /* The date and the size do not fit under a thumbnail this small. */
+    .photo-card__caption {
+        display: none;
+    }
+
+    /* Hide check UI on mobile but keep checkboxes for long press selection. */
+    .photo-card__actions,
+    .photo-card__actions:has(.photo-card__check),
+    .photo-card__check,
+    .photo-card__pick {
+        display: none !important;
+    }
+
+    .js-select-photo {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+    }
+
+    /* On the compact phone card there is no footer: show the Restore button
+       inline on the card (full width) so it stays reachable. */
+    .photo-card__actions {
+        display: flex;
+        padding: 0.4rem 0.5rem 0.5rem;
+        gap: 6px;
+    }
+
+    .photo-card__actions .inline-form {
+        width: 100%;
+    }
+
+    .photo-card__actions .inline-form .btn {
+        width: 100%;
+        min-height: var(--m-tap-secondary);
+    }
+}
+
+@media (hover: none) and (any-pointer: coarse) and (min-width: 768px) and (max-width: 1023.98px) {
+    .photo-grid,
+    .photo-grid--skeleton {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+    }
+
+    /* Hide check UI on touch tablet but keep checkboxes for long press selection. */
+    .photo-card__caption {
+        display: none;
+    }
+
+    .photo-card__actions,
+    .photo-card__actions:has(.photo-card__check),
+    .photo-card__check,
+    .photo-card__pick {
+        display: none !important;
+    }
+
+    .js-select-photo {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+    }
+
+    .photo-card__flag {
+        top: 0.3rem;
+        right: 0.3rem;
+        width: 0.55rem;
+        height: 0.55rem;
+        padding: 0;
+        font-size: 0;
+        border-radius: 999px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* ---------------- Archive: long press to select ----------------
+ *
+ * On a phone the archive card has no footer: a long press on the photo
+ * selects it, the check button in the corner of the thumbnail is the
+ * shortcut, and "Restore selected" in the bulk bar puts the photos back.
+ * The "Restore" button of the card stays on the wide layout, where the
+ * card has the room for it. */
+
+.archive-hint {
+    display: none;
+    margin: 0 0 0.75rem;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--color-border-soft);
+    border-radius: var(--radius-md);
+    background: var(--color-surface);
+    color: var(--color-muted);
+    font-size: 0.8rem;
+    line-height: 1.4;
+    text-align: center;
+}
+
+@media (max-width: 767.98px) {
+    .archive-hint {
+        display: none !important;
+    }
+
+    /* Hide check UI on mobile archive but keep checkboxes for long press selection. */
+    .photo-card--archive .photo-card__actions,
+    .photo-card--archive .photo-card__actions:has(.photo-card__check),
+    .photo-card--archive .photo-card__check,
+    .photo-card--archive .photo-card__pick {
+        display: none !important;
+    }
+
+    .photo-card--archive .js-select-photo {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+    }
+}
+
+@media (hover: none) and (any-pointer: coarse) and (min-width: 768px) and (max-width: 1023.98px) {
+    /* Hide check UI on touch tablet archive but keep checkboxes for long press selection. */
+    .photo-card--archive .photo-card__actions,
+    .photo-card--archive .photo-card__actions:has(.photo-card__check),
+    .photo-card--archive .photo-card__check,
+    .photo-card--archive .photo-card__pick {
+        display: none !important;
+    }
+
+    .photo-card--archive .js-select-photo {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        padding: 0 !important;
+        margin: -1px !important;
+        overflow: hidden !important;
+        clip: rect(0, 0, 0, 0) !important;
+        white-space: nowrap !important;
+        border: 0 !important;
+    }
+}
+
+/* ---------------- Selecting photos ----------------
+ *
+ * A photo is selected with the check button in the corner of the thumbnail
+ * (the compact phone card) or with the checkbox in the card footer (the
+ * desktop card), and a long press selects it as well. The selected photo is
+ * marked with a check badge and a frame, in every view. */
+
+.photo-card {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+/* The check button in the corner of the thumbnail. It is only used by the
+   compact phone card; the desktop card has a checkbox in its footer. */
+.photo-card__pick {
+    position: absolute;
+    top: 0.3rem;
+    left: 0.3rem;
+    z-index: 2;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.35);
+    color: transparent;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.photo-card__pick svg {
+    opacity: 0;
+}
+
+.photo-card__pick:focus-visible {
+    outline: 3px solid var(--color-focus-on-dark);
+    outline-offset: 2px;
+}
+
+/* Corner check button removed on mobile as requested. */
+@media (max-width: 767.98px) {
+    .photo-card__pick {
+        display: none !important;
+    }
+}
+
+@media (hover: none) and (any-pointer: coarse) and (min-width: 768px) and (max-width: 1023.98px) {
+    .photo-card__pick {
+        display: none !important;
+    }
+}
+
+/* Archived photos carry a small badge next to the thumbnail. */
+.photo-card__archived {
+    position: absolute;
+    top: 0.4rem;
+    left: 0.4rem;
+    background: var(--color-surface);
+    color: var(--color-heading);
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.photo-card.is-selected {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px var(--color-primary-soft), var(--shadow-soft-hover);
+}
+
+.photo-card.is-selected .photo-card__pick {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #ffffff;
+}
+
+.photo-card.is-selected .photo-card__pick svg {
+    opacity: 1;
+}
+
+/* ---------------- Phone bulk action bar ----------------
+ *
+ * The bottom navigation is fixed to the bottom of the screen, so the bulk
+ * bar has to sit above it. Parked at the very bottom it was hidden behind
+ * the navigation and only a sliver of it showed. The bar also stacks its
+ * buttons in a 2x2 grid on phones, because the four actions do not fit on
+ * one row at that width.
+ *
+ * --bottom-nav-h is the measured height of the visible bottom navigation
+ * (set by initBottomNavOffset in app.js); the fallback is used until the
+ * script runs or when JavaScript is unavailable. */
+
+@media (max-width: 899.98px) {
+    .bulk-bar {
+        left: 0.6rem;
+        right: 0.6rem;
+        width: auto;
+        bottom: calc(var(--bottom-nav-h, calc(4.25rem + env(safe-area-inset-bottom, 0px))) + 0.5rem);
+        transform: translateY(150%);
+        z-index: 230;
+    }
+
+    .bulk-bar.is-visible {
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 767.98px) {
+    .bulk-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.45rem;
+        padding: 0.6rem 0.7rem;
+    }
+
+    .bulk-bar p {
+        font-size: 0.85rem;
+        text-align: center;
+    }
+
+    .bulk-bar__actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.4rem;
+    }
+
+    .bulk-bar__actions .btn {
+        width: 100%;
+        min-height: 40px;
+        font-size: 12.5px;
+        padding: 0.35rem 0.4rem;
     }
 }

@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Contracts\DirectUploadSigner;
 use App\Listeners\LockoutListener;
 use App\Listeners\LoginFailedListener;
 use App\Listeners\LoginSuccessfulListener;
 use App\Listeners\LogoutListener;
+use App\Services\S3DirectUploadSigner;
 use Illuminate\Auth\Events\Failed;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Auth\Events\Login;
@@ -24,7 +26,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // The photos are uploaded straight to the bucket with a signed URL.
+        $this->app->singleton(DirectUploadSigner::class, S3DirectUploadSigner::class);
     }
 
     /**

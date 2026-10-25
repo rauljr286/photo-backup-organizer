@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Concerns;
 use App\Http\Requests\StorePhotoRequest;
 use App\Models\Photo;
 use App\Services\PhotoStorageService;
+use App\Support\PhotoUploadResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -63,17 +64,15 @@ trait HandlesPhotoUploads
             ->map(fn (array $entry) => [
                 'key' => $entry['key'],
                 'original_filename' => $entry['original_filename'],
-                'error' => 'This photo is already backed up.',
+                'error' => PhotoStorageService::ERROR_DUPLICATE,
             ])
             ->values()
             ->all();
 
-        return response()->json([
-            'message' => $this->summaryMessage($uploaded, $result['failed'], $duplicates),
-            'uploaded' => $uploaded,
-            'failed' => $result['failed'],
-            'duplicates' => $duplicates,
-        ], $uploaded !== [] ? 201 : 200);
+        return response()->json(
+            PhotoUploadResponse::make($uploaded, $result['failed'], $duplicates),
+            $uploaded !== [] ? 201 : 200,
+        );
     }
 
     /**
@@ -81,19 +80,7 @@ trait HandlesPhotoUploads
      */
     protected function uploadedPhotoPayload(Photo $photo, string $key): array
     {
-        return [
-            'key' => $key,
-            'id' => $photo->id,
-            'url' => $photo->url(),
-            'thumbnail_url' => $photo->thumbnailUrl(),
-            'description' => $photo->description(),
-            'original_filename' => $photo->original_filename,
-            'size_bytes' => $photo->size_bytes,
-            'mime_type' => $photo->mime_type,
-            'taken_at' => $photo->taken_at?->toISOString(),
-            'tags' => $photo->tags ?? [],
-            'backed_up' => $photo->isBackedUp(),
-        ];
+        return PhotoUploadResponse::photoPayload($photo, $key);
     }
 
     /**
@@ -106,32 +93,7 @@ trait HandlesPhotoUploads
      */
     protected function summaryMessage(array $uploaded, array $failed, array $duplicates = []): string
     {
-        $ok = count($uploaded);
-        $bad = count($failed);
-        $dup = count($duplicates);
-        $total = $ok + $bad + $dup;
-
-        if ($ok === 0 && $total >= 1) {
-            return $dup === $total
-                ? ($total === 1 ? 'This photo is already backed up.' : "{$dup} photos are already backed up.")
-                : 'Upload failed: '.($failed[0]['error'] ?? 'unknown error.');
-        }
-
-        $parts = [];
-
-        if ($bad === 0) {
-            $parts[] = $total === 1
-                ? '1 photo uploaded successfully.'
-                : $ok.' photo(s) uploaded successfully.';
-        } else {
-            $parts[] = "{$ok} of {$total} photos uploaded successfully, {$bad} failed.";
-        }
-
-        if ($dup > 0) {
-            $parts[] = $dup === 1 ? '1 duplicate already backed up.' : $dup.' duplicates already backed up.';
-        }
-
-        return implode(' ', $parts);
+        return PhotoUploadResponse::summaryMessage($uploaded, $failed, $duplicates);
     }
 
     /**

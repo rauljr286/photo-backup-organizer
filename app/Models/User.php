@@ -221,4 +221,14 @@ class User extends Authenticatable
     {
         return $this->storageUsedBytes() + $bytes <= $this->storageLimitBytes();
     }
+
+    /**
+     * Whether the user has room for an additional file of the given size,
+     * counting the uploads that are on their way to the bucket. Those files
+     * are not part of the library yet, but their space is already spoken for.
+     */
+    public function hasStorageForWithReservations(int $bytes, int $reservedBytes = 0): bool
+    {
+        return $this->storageUsedBytes() + $reservedBytes + $bytes <= $this->storageLimitBytes();
+    }
 }

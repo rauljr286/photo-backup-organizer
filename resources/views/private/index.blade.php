@@ -148,23 +148,38 @@
                 </details>
             </div>
         @else
-            <x-upload-dropzone :url="route('private.photos.store')"></x-upload-dropzone>
+            <x-upload-dropzone :url="route('private.photos.store')" :private="true"></x-upload-dropzone>
 
             <section class="photo-section private-gallery" id="photo-section" aria-labelledby="private-grid-heading">
                 <h2 class="visually-hidden" id="private-grid-heading">Your private photos</h2>
 
-                <div class="photo-grid" id="photo-grid">
-                    @foreach ($photos as $photo)
-                        <x-photo-card :photo="$photo"></x-photo-card>
-                    @endforeach
-                </div>
+            <div class="photo-grid" id="photo-grid">
+                @foreach ($photos as $photo)
+                    <x-photo-card :photo="$photo" :selectable="true"></x-photo-card>
+                @endforeach
+            </div>
 
-                @if ($photos->hasPages())
-                    <nav class="pagination" aria-label="Private photo pages">
-                        {{ $photos->withQueryString()->links() }}
-                    </nav>
+
+                @if ($photos->hasMorePages())
+                    <div class="grid-sentinel" data-infinite-scroll
+                         data-page-url="{{ route('private.photos.page') }}"
+                         data-next-page="{{ $photos->currentPage() + 1 }}"
+                         data-has-more="true" aria-live="polite">
+                        <span class="grid-sentinel__spinner" aria-hidden="true"></span>
+                        <span class="grid-sentinel__text">Loading more photos&hellip;</span>
+                    </div>
                 @endif
             </section>
         @endif
+    </div>
+
+    <div class="bulk-bar" id="bulk-bar" role="region" aria-label="Bulk actions" hidden>
+        <p><strong id="bulk-count">0</strong> selected</p>
+        <div class="bulk-bar__actions">
+            <button type="button" class="btn btn--primary btn--sm" id="download-selected" data-url="{{ route('photos.download-selected') }}">Download selected</button>
+            <button type="button" class="btn btn--primary btn--sm" id="edit-selected">Edit details</button>
+            <button type="button" class="btn btn--primary btn--sm" id="archive-selected">Archive selected</button>
+            <button type="button" class="btn btn--ghost btn--sm" id="clear-selected">Clear selection</button>
+        </div>
     </div>
 </x-app-layout>

@@ -8,6 +8,8 @@
         @endif
     </a>
 
+    {{-- Check button removed --}}
+
     <figcaption class="photo-card__caption">
         <span class="photo-card__date">
             {{ $photo->taken_at ? $photo->taken_at->format('M j, Y') : 'Taken date unknown' }}

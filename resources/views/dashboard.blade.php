@@ -1,16 +1,10 @@
 <x-app-layout :title="'My photos'">
     <div class="dashboard">
+
         <x-hero-banner
             :greeting="'Welcome back, ' . \Illuminate\Support\Str::before(auth()->user()->name, ' ') . '!'"
             :eyebrow="'Your photo library'"
-
             :user="auth()->user()"
-            :stats="[
-                ['icon' => 'photo', 'value' => $activeCount, 'label' => 'Photos', 'tint' => 'stat__icon--primary'],
-                ['icon' => 'album', 'value' => $albums->count(), 'label' => 'Albums', 'tint' => 'stat__icon--accent'],
-                ['icon' => 'storage', 'value' => $usedPercent . '%', 'label' => 'Storage used', 'note' => number_format($usedBytes / 1024 / 1024, 1) . ' of ' . number_format($limitBytes / 1024 / 1024, 0) . ' MB', 'meter' => $usedPercent, 'tint' => 'stat__icon--teal'],
-                ['icon' => 'archive', 'value' => $archivedCount, 'label' => 'Archived', 'tint' => 'stat__icon--rose'],
-            ]"
         ></x-hero-banner>
 
         <div class="dashboard__body">
@@ -159,10 +153,14 @@
                         @endforeach
                     </div>
 
-                    @if ($photos->hasPages())
-                        <nav class="pagination" aria-label="Photo pages">
-                            {{ $photos->withQueryString()->links() }}
-                        </nav>
+                    @if ($photos->hasMorePages())
+                        <div class="grid-sentinel" data-infinite-scroll
+                             data-page-url="{{ route('photos.page') }}"
+                             data-next-page="{{ $photos->currentPage() + 1 }}"
+                             data-has-more="true" aria-live="polite">
+                            <span class="grid-sentinel__spinner" aria-hidden="true"></span>
+                            <span class="grid-sentinel__text">Loading more photos&hellip;</span>
+                        </div>
                     @endif
                 @endif
             </section>

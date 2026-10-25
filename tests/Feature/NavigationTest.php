@@ -33,7 +33,6 @@ class NavigationTest extends TestCase
         $this->actingAs($user)
             ->get('/dashboard')
             ->assertOk()
-            ->assertSee('tabnav__badge', false)
             ->assertSee('bottom-nav__badge', false)
             ->assertSee('3</span>', false);
     }
@@ -51,7 +50,7 @@ class NavigationTest extends TestCase
         $this->assertStringContainsString(route('private'), $more);
     }
 
-    public function test_the_desktop_pill_nav_lists_the_five_primary_items(): void
+    public function test_the_desktop_pill_nav_lists_the_primary_items(): void
     {
         $user = User::factory()->create();
 
@@ -63,6 +62,32 @@ class NavigationTest extends TestCase
         }
     }
 
+    public function test_the_bottom_nav_lists_all_tabs_including_archive_and_cleanup(): void
+    {
+        $user = User::factory()->create();
+
+        $html = $this->actingAs($user)->get('/dashboard')->getContent();
+        $nav = Str::before(Str::after($html, '<nav class="bottom-nav"'), '</nav>');
+
+        $this->assertStringContainsString(route('archive'), $nav);
+        $this->assertStringContainsString(route('cleanup'), $nav);
+        $this->assertStringContainsString(route('dashboard'), $nav);
+        $this->assertStringContainsString(route('albums.index'), $nav);
+        $this->assertStringContainsString(route('insights'), $nav);
+        $this->assertStringNotContainsString($user->name, $nav);
+    }
+
+    public function test_the_phone_bottom_bar_has_no_more_button(): void
+    {
+        $user = User::factory()->create();
+
+        $html = $this->actingAs($user)->get('/dashboard')->getContent();
+
+        $this->assertStringNotContainsString('id="phone-more-panel"', $html);
+        // The tablet band keeps its own More panel.
+        $this->assertStringContainsString('id="bottom-more-panel"', $html);
+    }
+
     public function test_the_mobile_more_menu_excludes_profile(): void
     {
         $user = User::factory()->create();
@@ -72,6 +97,7 @@ class NavigationTest extends TestCase
 
         $this->assertStringContainsString('Sign out', $more);
         $this->assertStringNotContainsString('Profile &amp; settings', $more);
+        $this->assertStringNotContainsString('data-theme-toggle', $more);
     }
 
     private function archivedPhoto(User $user, string $name): Photo

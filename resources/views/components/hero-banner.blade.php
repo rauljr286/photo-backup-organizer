@@ -25,10 +25,6 @@
         @endif
 
         <div class="hero__intro">
-            @if ($eyebrow)
-                <p class="hero__eyebrow">{{ $eyebrow }}</p>
-            @endif
-
             <h1 class="hero__title">{{ $greeting }}</h1>
 
             @if ($subtitle)

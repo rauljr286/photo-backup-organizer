@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AlbumController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DirectUploadController;
 use App\Http\Controllers\Api\PhotoController;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +25,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/photos', [PhotoController::class, 'index']);
     Route::post('/photos', [PhotoController::class, 'store']);
+    Route::post('/photos/uploads/prepare', [DirectUploadController::class, 'prepareUpload'])
+        ->middleware('throttle:120,1');
+    Route::post('/photos/uploads/complete', [DirectUploadController::class, 'completeUpload'])
+        ->middleware('throttle:120,1');
     Route::get('/photos/{photo}', [PhotoController::class, 'show']);
     Route::delete('/photos/{photo}', [PhotoController::class, 'archive']);
     Route::post('/photos/{photo}/unarchive', [PhotoController::class, 'unarchive']);

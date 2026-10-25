@@ -3,7 +3,6 @@
         <div class="dashboard__top">
             <div>
                 <h1 class="page-title">Cleanup suggestions</h1>
-                <p class="page-subtitle">Pick a category to find photos worth reviewing. Nothing here is deleted for you.</p>
             </div>
         </div>
 
@@ -45,12 +44,9 @@
 
         <section class="panel tabpanel" role="tabpanel" id="panel-duplicates" aria-labelledby="tab-duplicates" data-panel="duplicates" @if ($activeTab !== 'duplicates') hidden @endif>
             <h2 class="panel__heading" id="duplicates-heading">Duplicate photos</h2>
-            <p class="panel__subheading">Photos that share the exact same byte content. Keeping one copy of each group
-                would free up {{ $fmt($wasteBytes) }} ({{ $duplicateCount }} extra
-                photo{{ $duplicateCount === 1 ? '' : 's' }}).</p>
 
             @if ($duplicates->isEmpty())
-                <p class="empty-note">No duplicates found. If you spot a match, check the largest photos first.</p>
+                
             @else
                 @foreach ($duplicates as $group)
                     <div class="duplicate-group">
@@ -72,11 +68,9 @@
 
         <section class="panel tabpanel" role="tabpanel" id="panel-large" aria-labelledby="tab-large" data-panel="large" @if ($activeTab !== 'large') hidden @endif>
             <h2 class="panel__heading" id="largest-heading">Largest photos</h2>
-            <p class="panel__subheading">10 biggest photos in your library. Big files are rare, but they eat the most
-                space.</p>
 
             @if ($largest->isEmpty())
-                <p class="empty-note">No photos uploaded yet.</p>
+                
             @else
                 <ul class="photo-row-list">
                     @foreach ($largest as $index => $photo)
@@ -96,14 +90,9 @@
 
         <section class="panel tabpanel" role="tabpanel" id="panel-albums" aria-labelledby="tab-albums" data-panel="albums" @if ($activeTab !== 'albums') hidden @endif>
             <h2 class="panel__heading" id="albums-heading">Not in any album</h2>
-            <p class="panel__subheading">
-                {{ $notInAlbum->count() }} photo{{ $notInAlbum->count() === 1 ? '' : 's' }}
-                {{ $notInAlbum->count() === 1 ? 'is' : 'are' }} not filed under an album yet. Albums make hard-to-find
-                moments easy to browse.
-            </p>
 
             @if ($notInAlbum->isEmpty())
-                <p class="empty-note">Every photo is part of an album. Nice work.</p>
+                
             @else
                 <ul class="photo-row-list">
                     @foreach ($notInAlbum as $photo)
@@ -123,13 +112,9 @@
 
         <section class="panel tabpanel" role="tabpanel" id="panel-description" aria-labelledby="tab-description" data-panel="description" @if ($activeTab !== 'description') hidden @endif>
             <h2 class="panel__heading" id="description-heading">Missing description</h2>
-            <p class="panel__subheading">
-                {{ $missingDescription->count() }} photo{{ $missingDescription->count() === 1 ? '' : 's' }} still use
-                automatic alt text. A written description helps screen readers and makes photos easier to search.
-            </p>
 
             @if ($missingDescription->isEmpty())
-                <p class="empty-note">Every photo has a written description.</p>
+                
             @else
                 <ul class="photo-row-list">
                     @foreach ($missingDescription as $photo)

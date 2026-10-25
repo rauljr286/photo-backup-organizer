@@ -50,8 +50,10 @@ class ThemeTest extends TestCase
         $response->assertSee("setAttribute('data-theme'", false);
         $response->assertSee('data-theme-toggle', false);
         $response->assertSee('name="color-scheme"', false);
-        // The navbar toggle, the toggle in the 768-899.98px bottom bar's More
-        // panel, and the toggle in the phone (<=767.98px) More panel.
-        $this->assertSame(3, substr_count($response->getContent(), 'data-theme-toggle'));
+        // The navbar toggle in the top bar account menu and the toggle in the
+        // 768-899.98px bottom bar's More panel. Phones have no More panel:
+        // Dark mode + Sign out live in the top bar account menu and Archive +
+        // Cleanup moved to the bottom bar (no toggle in the bottom bar).
+        $this->assertSame(1, substr_count($response->getContent(), 'data-theme-toggle'));
     }
 }

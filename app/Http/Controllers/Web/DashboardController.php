@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Concerns\HandlesPhotoUploads;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePhotoRequest;
+use App\Models\Photo;
 use App\Services\PhotoStorageService;
 use App\Support\PrivateGallery;
 use Illuminate\Contracts\View\View;
@@ -21,6 +22,11 @@ use Illuminate\Validation\ValidationException;
 class DashboardController extends Controller
 {
     use HandlesPhotoUploads;
+
+    /**
+     * How many photos a single page of the library holds.
+     */
+    public const PHOTOS_PER_PAGE = 24;
 
     public function __construct(
         protected PhotoStorageService $photos,
@@ -41,7 +47,7 @@ class DashboardController extends Controller
             'to' => ['nullable', 'date'],
         ]);
 
-        $paginator = $this->photos->filteredPhotos($user, $filters, 24);
+        $paginator = $this->photos->filteredPhotos($user, $filters, self::PHOTOS_PER_PAGE);
 
         return view('dashboard', [
             'user' => $user,
@@ -98,17 +104,54 @@ class DashboardController extends Controller
         $photos = $this->photos->latestPhotos($user, $filters, $afterId);
 
         return response()->json([
-            'photos' => $photos->map(fn ($photo) => [
-                'id' => $photo->id,
-                'url' => $photo->url(),
-                'thumbnail_url' => $photo->thumbnailUrl(),
-                'description' => $photo->description(),
-                'size_bytes' => $photo->size_bytes,
-                'taken_at' => $photo->taken_at?->toISOString(),
-                'backed_up' => $photo->isBackedUp(),
-            ])->values(),
+            'photos' => $photos->map(fn ($photo) => $this->photoPayload($photo))->values(),
             'latest_id' => $photos->max('id') ?? $afterId,
         ]);
+    }
+
+    /**
+     * Return one page of photos as JSON. The grid uses this to keep loading
+     * more photos while the user scrolls instead of showing numbered pages.
+     */
+    public function page(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $filters = $request->validate([
+            'search' => ['nullable', 'string', 'max:255'],
+            'album' => ['nullable', 'integer'],
+            'tags' => ['nullable', 'string', 'max:255'],
+            'from' => ['nullable', 'date'],
+            'to' => ['nullable', 'date'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        $paginator = $this->photos->filteredPhotos($user, $filters, self::PHOTOS_PER_PAGE);
+
+        return response()->json([
+            'photos' => $paginator->getCollection()
+                ->map(fn ($photo) => $this->photoPayload($photo))
+                ->values(),
+            'has_more' => $paginator->hasMorePages(),
+            'next_page' => $paginator->currentPage() + 1,
+            'total' => $paginator->total(),
+        ]);
+    }
+
+    /**
+     * The shape a single photo takes in every JSON response the grid uses.
+     */
+    protected function photoPayload(Photo $photo): array
+    {
+        return [
+            'id' => $photo->id,
+            'url' => $photo->url(),
+            'thumbnail_url' => $photo->thumbnailUrl(),
+            'description' => $photo->description(),
+            'size_bytes' => $photo->size_bytes,
+            'taken_at' => $photo->taken_at?->toISOString(),
+            'backed_up' => $photo->isBackedUp(),
+        ];
     }
 
     /**
