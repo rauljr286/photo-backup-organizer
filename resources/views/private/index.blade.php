@@ -12,7 +12,6 @@
             </div>
             @if ($mode === 'gallery')
                 <div class="section-head__actions">
-                    <a href="{{ route('profile.private', ['from' => 'gallery']) }}" class="btn btn--secondary">Private settings</a>
                     <form method="POST" action="{{ route('private.lock') }}" class="inline-form">
                         @csrf
                         <button type="submit" class="btn btn--primary">Lock gallery</button>

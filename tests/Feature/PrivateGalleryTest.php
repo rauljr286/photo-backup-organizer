@@ -346,23 +346,18 @@ class PrivateGalleryTest extends TestCase
         $this->actingAs($user)
             ->get('/private')
             ->assertOk()
-            ->assertSee('Private settings')
+            ->assertDontSee('Private settings')
             ->assertSee('Lock gallery')
             ->assertDontSee('id="private-gate-dialog"', false);
     }
 
-    public function test_the_gallery_settings_link_opens_the_panel_without_the_password(): void
+    public function test_the_private_settings_panel_can_be_opened_from_the_gallery_context(): void
     {
         $user = $this->userWithPrivatePassword();
 
         $this->actingAs($user)
             ->post('/private/unlock', ['private_password' => 'secret-pass'])
             ->assertRedirect(route('private'));
-
-        $this->actingAs($user)
-            ->get('/private')
-            ->assertOk()
-            ->assertSee('href="'.route('profile.private', ['from' => 'gallery']).'"', false);
 
         $response = $this->actingAs($user)->get('/profile/private?from=gallery');
         $response->assertRedirect();
