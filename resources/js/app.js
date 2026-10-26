@@ -280,6 +280,7 @@ function initUploads() {
 
                 const formData = new FormData();
                 entries.forEach((entry) => {
+                    entry.setUploading();
                     formData.append('photos[]', entry.file);
                     formData.append('keys[]', entry.key);
                 });
@@ -421,6 +422,7 @@ function initUploads() {
             }
 
             try {
+                entry.setUploading();
                 await putDirectUpload(prepared, file, entry);
             } catch (err) {
                 settleEntry(entry, false, err.message);
@@ -548,6 +550,13 @@ function createUploadItem(file, list, { nextKey, onRetry }) {
     entry.setProgress = (pct) => {
         entry.bar.style.width = `${pct}%`;
         entry.status.textContent = `${pct}%`;
+    };
+
+    entry.setUploading = () => {
+        entry.status.textContent = 'Uploading…';
+        entry.status.title = file.name;
+        li.classList.remove('is-failed', 'is-done');
+        bar.classList.remove('is-failed');
     };
 
     entry.setQueued = () => {

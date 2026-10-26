@@ -9,13 +9,6 @@
             </span>
             <div class="section-head__text">
                 <h1 class="section-head__title">Private gallery</h1>
-                <p class="section-head__subtitle">
-                    @if ($mode === 'gallery')
-                        {{ number_format($photos->total()) }} {{ \Illuminate\Support\Str::plural('photo', $photos->total()) }} &middot; kept out of your main library.
-                    @else
-                        A separate, password-protected space for your most private photos.
-                    @endif
-                </p>
             </div>
             @if ($mode === 'gallery')
                 <div class="section-head__actions">
