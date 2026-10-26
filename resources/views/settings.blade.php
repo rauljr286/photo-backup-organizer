@@ -198,7 +198,7 @@
                     </section>
                 @endif
 
-                @if ($activeTab === 'private')
+                @if ($activeTab === 'private' && (! $privateConfigured || $privateUnlocked))
                     <section class="profile__panel profile__panel--private" role="tabpanel" aria-labelledby="tab-private">
                         <h2 class="profile__card-title">Private gallery</h2>
 
@@ -249,17 +249,17 @@
                                 <div class="field">
                                     <label class="field__label" for="current_private_password">Current private password</label>
                                     <input class="field__input" id="current_private_password" type="password" name="current_private_password"
-                                           required autocomplete="current-password">
+                                           autocomplete="current-password">
                                 </div>
                                 <div class="field">
                                     <label class="field__label" for="private_password">New private password</label>
                                     <input class="field__input" id="private_password" type="password" name="private_password"
-                                           required minlength="4" autocomplete="new-password">
+                                           minlength="4" autocomplete="new-password">
                                 </div>
                                 <div class="field">
                                     <label class="field__label" for="private_password_confirmation">Confirm new private password</label>
                                     <input class="field__input" id="private_password_confirmation" type="password" name="private_password_confirmation"
-                                           required minlength="4" autocomplete="new-password">
+                                           minlength="4" autocomplete="new-password">
                                 </div>
 
                                 <button type="submit" class="btn btn--primary">Change private password</button>
@@ -277,17 +277,17 @@
                                     <div class="field">
                                         <label class="field__label" for="reset_current_password">Account password</label>
                                         <input class="field__input" id="reset_current_password" type="password" name="current_password"
-                                               required autocomplete="current-password">
+                                               autocomplete="current-password">
                                     </div>
                                     <div class="field">
                                         <label class="field__label" for="reset_private_password">New private password</label>
                                         <input class="field__input" id="reset_private_password" type="password" name="private_password"
-                                               required minlength="4" autocomplete="new-password">
+                                               minlength="4" autocomplete="new-password">
                                     </div>
                                     <div class="field">
                                         <label class="field__label" for="reset_private_password_confirmation">Confirm new private password</label>
                                         <input class="field__input" id="reset_private_password_confirmation" type="password" name="private_password_confirmation"
-                                               required minlength="4" autocomplete="new-password">
+                                               minlength="4" autocomplete="new-password">
                                     </div>
 
                                     <button type="submit" class="btn btn--secondary">Reset private password</button>

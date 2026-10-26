@@ -301,9 +301,55 @@ class PrivateGalleryTest extends TestCase
     {
         $user = $this->userWithPrivatePassword();
 
-        $html = $this->actingAs($user)->get('/profile/private')->assertOk()->getContent();
+        $html = $this->actingAs($user)->get('/profile')->assertOk()->getContent();
 
         $this->assertMatchesRegularExpression('/id="tab-private"[^>]*data-private-gate/', $html);
+    }
+
+    public function test_private_settings_forms_are_absent_while_the_gallery_is_locked(): void
+    {
+        $user = $this->userWithPrivatePassword();
+
+        $this->actingAs($user)
+            ->get('/profile/private')
+            ->assertRedirect(route('profile'));
+
+        $this->actingAs($user)
+            ->get('/profile')
+            ->assertOk()
+            ->assertDontSee('profile__panel--private', false)
+            ->assertDontSee('Change private password')
+            ->assertDontSee('id="current_private_password"', false)
+            ->assertDontSee('id="reset_current_password"', false)
+            ->assertDontSee('id="private_password_confirmation"', false);
+
+        $this->actingAs($user)
+            ->get('/profile?tab=private')
+            ->assertRedirect(route('profile'));
+    }
+
+    public function test_private_settings_forms_are_present_after_unlocking(): void
+    {
+        $user = $this->userWithPrivatePassword();
+
+        $this->actingAs($user)
+            ->withSession([PrivateGallery::SESSION_KEY => true])
+            ->get('/profile/private')
+            ->assertOk()
+            ->assertSee('Change private password')
+            ->assertSee('Current private password')
+            ->assertSee('Reset private password')
+            ->assertDontSee('id="private-gate-dialog"', false);
+    }
+
+    public function test_a_locked_private_tab_returns_to_the_previous_settings_tab(): void
+    {
+        $user = $this->userWithPrivatePassword();
+
+        $this->actingAs($user)
+            ->from('/profile/privacy')
+            ->get('/profile/private')
+            ->assertRedirect(route('profile.privacy'));
     }
 
     public function test_the_unlock_gate_dialog_is_not_duplicated_on_the_private_page(): void

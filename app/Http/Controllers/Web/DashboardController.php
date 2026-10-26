@@ -200,7 +200,7 @@ class DashboardController extends Controller
     /**
      * Account settings, terms of service and privacy policy.
      */
-    public function settings(Request $request): View
+    public function settings(Request $request): View|RedirectResponse
     {
         return $this->renderSettings($request, 'profile');
     }
@@ -208,7 +208,7 @@ class DashboardController extends Controller
     /**
      * Preferences & security tab.
      */
-    public function settingsSecurity(Request $request): View
+    public function settingsSecurity(Request $request): View|RedirectResponse
     {
         return $this->renderSettings($request, 'security');
     }
@@ -216,7 +216,7 @@ class DashboardController extends Controller
     /**
      * Privacy & data tab.
      */
-    public function settingsPrivacy(Request $request): View
+    public function settingsPrivacy(Request $request): View|RedirectResponse
     {
         return $this->renderSettings($request, 'privacy');
     }
@@ -224,7 +224,7 @@ class DashboardController extends Controller
     /**
      * Private gallery tab.
      */
-    public function settingsPrivate(Request $request): View
+    public function settingsPrivate(Request $request): View|RedirectResponse
     {
         return $this->renderSettings($request, 'private');
     }
@@ -232,13 +232,19 @@ class DashboardController extends Controller
     /**
      * Build the account area with the requested tab highlighted.
      */
-    protected function renderSettings(Request $request, string $fallbackTab): View
+    protected function renderSettings(Request $request, string $fallbackTab): View|RedirectResponse
     {
         $user = $request->user();
         $tab = $request->query('tab', $fallbackTab);
 
         if (! in_array($tab, ['profile', 'security', 'privacy', 'private'], true)) {
             $tab = $fallbackTab;
+        }
+
+        // The private settings forms must never be rendered while the gallery
+        // is locked. Send the user back to the tab they came from instead.
+        if ($tab === 'private' && $user->hasPrivatePassword() && ! PrivateGallery::isUnlocked($request)) {
+            return redirect()->to($this->privateSettingsFallback($request, $fallbackTab));
         }
 
         return view('settings', [
@@ -256,6 +262,28 @@ class DashboardController extends Controller
             'privateUnlocked' => PrivateGallery::isUnlocked($request),
             'privatePhotoCount' => $user->privatePhotos()->count(),
         ]);
+    }
+
+    /**
+     * Where to send a locked private tab request: the tab that routed here, or
+     * the previous settings tab, never the private settings panel itself.
+     */
+    protected function privateSettingsFallback(Request $request, string $fallbackTab): string
+    {
+        if ($fallbackTab !== 'private') {
+            return $fallbackTab === 'profile'
+                ? route('profile')
+                : route('profile.'.$fallbackTab);
+        }
+
+        $previous = $request->headers->get('referer');
+        $path = $previous ? rtrim((string) parse_url($previous, PHP_URL_PATH), '/') : '';
+
+        return match ($path) {
+            '/profile/security' => route('profile.security'),
+            '/profile/privacy' => route('profile.privacy'),
+            default => route('profile'),
+        };
     }
 
     /**
