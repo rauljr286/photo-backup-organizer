@@ -330,7 +330,7 @@ class PrivateGalleryTest extends TestCase
             ->assertDontSee('id="private_password_confirmation"', false);
     }
 
-    public function test_private_settings_forms_are_present_only_after_unlocking(): void
+    public function test_unlocking_from_settings_redirects_to_the_private_gallery(): void
     {
         $user = $this->userWithPrivatePassword();
 
@@ -339,9 +339,33 @@ class PrivateGalleryTest extends TestCase
             'context' => 'settings',
         ]);
 
+        $response->assertRedirect(route('private'));
+        $response->assertSessionHas(PrivateGallery::SESSION_KEY, true);
+        $response->assertSessionMissing(PrivateGallery::SETTINGS_SESSION_KEY);
+
+        $this->actingAs($user)
+            ->get('/private')
+            ->assertOk()
+            ->assertSee('Private settings')
+            ->assertSee('Lock gallery')
+            ->assertDontSee('id="private-gate-dialog"', false);
+    }
+
+    public function test_the_gallery_settings_link_opens_the_panel_without_the_password(): void
+    {
+        $user = $this->userWithPrivatePassword();
+
+        $this->actingAs($user)
+            ->post('/private/unlock', ['private_password' => 'secret-pass'])
+            ->assertRedirect(route('private'));
+
+        $this->actingAs($user)
+            ->get('/private')
+            ->assertOk()
+            ->assertSee('href="'.route('profile.private', ['from' => 'gallery']).'"', false);
+
+        $response = $this->actingAs($user)->get('/profile/private?from=gallery');
         $response->assertRedirect();
-        $response->assertSessionHas(PrivateGallery::SETTINGS_SESSION_KEY);
-        $response->assertSessionMissing(PrivateGallery::SESSION_KEY);
 
         $this->actingAs($user)
             ->get($response->headers->get('Location'))
@@ -350,22 +374,48 @@ class PrivateGalleryTest extends TestCase
             ->assertSee('Current private password')
             ->assertSee('Reset private password')
             ->assertDontSee('id="private-gate-dialog"', false);
+    }
+
+    public function test_wrong_settings_password_keeps_the_unlock_modal_open(): void
+    {
+        $user = $this->userWithPrivatePassword();
+        $cancelUrl = route('profile.privacy');
 
         $this->actingAs($user)
-            ->get('/private')
+            ->from('/profile/privacy')
+            ->get('/profile/private')
             ->assertOk()
-            ->assertSee('Private gallery is locked');
+            ->assertSee('name="settings_cancel_url" value="'.$cancelUrl.'"', false);
+
+        $this->actingAs($user)
+            ->from('/profile/private')
+            ->post('/private/unlock', [
+                'private_password' => 'wrong-password',
+                'context' => 'settings',
+                'settings_cancel_url' => $cancelUrl,
+            ])
+            ->assertRedirect('/profile/private')
+            ->assertSessionHasErrors('private_password');
+
+        $this->actingAs($user)
+            ->get('/profile/private')
+            ->assertOk()
+            ->assertSee('id="private-gate-dialog"', false)
+            ->assertSee('data-force-open', false)
+            ->assertSee('href="'.$cancelUrl.'"', false)
+            ->assertSee('>Cancel</a>', false)
+            ->assertDontSee('Change private password');
     }
 
     public function test_switching_tabs_relocks_the_private_settings_panel(): void
     {
         $user = $this->userWithPrivatePassword();
 
-        $response = $this->actingAs($user)->post('/private/unlock', [
-            'private_password' => 'secret-pass',
-            'context' => 'settings',
-        ]);
+        $this->actingAs($user)
+            ->post('/private/unlock', ['private_password' => 'secret-pass'])
+            ->assertRedirect(route('private'));
 
+        $response = $this->actingAs($user)->get('/profile/private?from=gallery');
         $unlockedUrl = $response->headers->get('Location');
 
         $this->actingAs($user)
@@ -394,11 +444,11 @@ class PrivateGalleryTest extends TestCase
     {
         $user = $this->userWithPrivatePassword();
 
-        $response = $this->actingAs($user)->post('/private/unlock', [
-            'private_password' => 'secret-pass',
-            'context' => 'settings',
-        ]);
+        $this->actingAs($user)
+            ->post('/private/unlock', ['private_password' => 'secret-pass'])
+            ->assertRedirect(route('private'));
 
+        $response = $this->actingAs($user)->get('/profile/private?from=gallery');
         $unlockedUrl = $response->headers->get('Location');
 
         $this->actingAs($user)

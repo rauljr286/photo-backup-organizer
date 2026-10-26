@@ -105,15 +105,11 @@ class PrivateController extends Controller
             ]);
         }
 
-        if ($request->input('context') === 'settings') {
-            $token = PrivateGallery::unlockSettings($request);
-
-            return redirect()
-                ->route('profile.private', ['private_unlock' => $token])
-                ->with('status', 'Private settings unlocked.');
-        }
-
         PrivateGallery::unlock($request);
+
+        if ($request->input('context') === 'settings') {
+            PrivateGallery::lockSettings($request);
+        }
 
         // Land straight on the gallery so the unlocked photos are shown, no
         // matter which page the popup was opened from.

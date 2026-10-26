@@ -20,6 +20,9 @@
         <form method="POST" action="{{ route('private.unlock') }}" class="form">
             @csrf
             <input type="hidden" name="context" value="{{ $context }}">
+            @if ($cancelUrl)
+                <input type="hidden" name="settings_cancel_url" value="{{ $cancelUrl }}">
+            @endif
 
             <div class="field">
                 <label class="field__label" for="private_gate_password">Private password</label>

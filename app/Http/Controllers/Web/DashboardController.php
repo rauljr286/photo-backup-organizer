@@ -241,6 +241,27 @@ class DashboardController extends Controller
             $tab = $fallbackTab;
         }
 
+        if ($tab === 'private'
+            && $request->query('from') === 'gallery'
+            && $user->hasPrivatePassword()
+            && PrivateGallery::isUnlocked($request)
+            && ! PrivateGallery::isSettingsUnlocked($request)) {
+            $token = PrivateGallery::unlockSettings($request);
+
+            return redirect()->route('profile.private', ['private_unlock' => $token]);
+        }
+
+        $cancelUrl = $this->privateSettingsFallback($request, $fallbackTab);
+        $previousCancel = $request->old('settings_cancel_url');
+
+        if (is_string($previousCancel) && in_array($previousCancel, [
+            route('profile'),
+            route('profile.security'),
+            route('profile.privacy'),
+        ], true)) {
+            $cancelUrl = $previousCancel;
+        }
+
         return view('settings', [
             'user' => $user,
             'activeTab' => $tab,
@@ -258,7 +279,7 @@ class DashboardController extends Controller
                 && $user->hasPrivatePassword()
                 && PrivateGallery::isSettingsUnlocked($request),
             'privatePhotoCount' => $user->privatePhotos()->count(),
-            'privateGateCancelUrl' => $this->privateSettingsFallback($request, $fallbackTab),
+            'privateGateCancelUrl' => $cancelUrl,
         ]);
     }
 
