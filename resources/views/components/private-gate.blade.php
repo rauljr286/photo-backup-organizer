@@ -1,17 +1,25 @@
+@props([
+    'context' => 'gallery',
+    'force' => false,
+    'cancelUrl' => null,
+])
+
 @php
     $user = auth()->user();
-    $locked = $user
+    $locked = $force || ($user
         && $user->hasPrivatePassword()
-        && ! \App\Support\PrivateGallery::isUnlocked(request());
+        && ! \App\Support\PrivateGallery::isUnlocked(request()));
 @endphp
 
 @if ($locked)
-    <dialog class="dialog private-gate" id="private-gate-dialog" aria-labelledby="private-gate-title" aria-describedby="private-gate-desc">
+    <dialog class="dialog private-gate" id="private-gate-dialog" aria-labelledby="private-gate-title" aria-describedby="private-gate-desc"
+            @if ($force) data-force-open @endif>
         <h2 class="dialog__title" id="private-gate-title">Private gallery is locked</h2>
         <p id="private-gate-desc">Enter your private password to view and upload private photos.</p>
 
         <form method="POST" action="{{ route('private.unlock') }}" class="form">
             @csrf
+            <input type="hidden" name="context" value="{{ $context }}">
 
             <div class="field">
                 <label class="field__label" for="private_gate_password">Private password</label>
@@ -20,7 +28,11 @@
             </div>
 
             <div class="dialog__actions">
-                <button type="button" class="btn btn--ghost js-dialog-close" data-target="private-gate-dialog">Cancel</button>
+                @if ($cancelUrl)
+                    <a href="{{ $cancelUrl }}" class="btn btn--ghost">Cancel</a>
+                @else
+                    <button type="button" class="btn btn--ghost js-dialog-close" data-target="private-gate-dialog">Cancel</button>
+                @endif
                 <button type="submit" class="btn btn--primary">Unlock</button>
             </div>
         </form>

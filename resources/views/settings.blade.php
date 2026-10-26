@@ -44,7 +44,7 @@
                 </a>
                 <a role="tab" aria-selected="{{ $activeTab === 'private' ? 'true' : 'false' }}"
                    class="profile__tab @if ($activeTab === 'private') is-active @endif"
-                   href="{{ route('profile.private') }}" id="tab-private" data-private-gate>
+                   href="{{ route('profile.private') }}" id="tab-private">
                     <svg class="profile__tab-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                         <rect x="3" y="11" width="18" height="11" rx="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                     </svg>
@@ -198,7 +198,7 @@
                     </section>
                 @endif
 
-                @if ($activeTab === 'private' && (! $privateConfigured || $privateUnlocked))
+                @if ($activeTab === 'private' && (! $privateConfigured || $privateSettingsUnlocked))
                     <section class="profile__panel profile__panel--private" role="tabpanel" aria-labelledby="tab-private">
                         <h2 class="profile__card-title">Private gallery</h2>
 
@@ -299,5 +299,9 @@
                 @endif
             </div>
         </div>
+
+        @if ($activeTab === 'private' && $privateConfigured && ! $privateSettingsUnlocked)
+            <x-private-gate context="settings" :force="true" :cancel-url="$privateGateCancelUrl" />
+        @endif
     </div>
 </x-app-layout>

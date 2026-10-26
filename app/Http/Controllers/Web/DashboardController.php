@@ -241,12 +241,6 @@ class DashboardController extends Controller
             $tab = $fallbackTab;
         }
 
-        // The private settings forms must never be rendered while the gallery
-        // is locked. Send the user back to the tab they came from instead.
-        if ($tab === 'private' && $user->hasPrivatePassword() && ! PrivateGallery::isUnlocked($request)) {
-            return redirect()->to($this->privateSettingsFallback($request, $fallbackTab));
-        }
-
         return view('settings', [
             'user' => $user,
             'activeTab' => $tab,
@@ -260,13 +254,17 @@ class DashboardController extends Controller
             'usedPercent' => $user->libraryStorageUsedPercent(),
             'privateConfigured' => $user->hasPrivatePassword(),
             'privateUnlocked' => PrivateGallery::isUnlocked($request),
+            'privateSettingsUnlocked' => $tab === 'private'
+                && $user->hasPrivatePassword()
+                && PrivateGallery::isSettingsUnlocked($request),
             'privatePhotoCount' => $user->privatePhotos()->count(),
+            'privateGateCancelUrl' => $this->privateSettingsFallback($request, $fallbackTab),
         ]);
     }
 
     /**
-     * Where to send a locked private tab request: the tab that routed here, or
-     * the previous settings tab, never the private settings panel itself.
+     * Where the settings unlock modal's Cancel action should go: the tab that
+     * routed here, or the previous settings tab, never the private panel.
      */
     protected function privateSettingsFallback(Request $request, string $fallbackTab): string
     {

@@ -113,7 +113,7 @@
 
     <x-flash-region></x-flash-region>
 
-    @unless (request()->routeIs('private'))
+    @unless (request()->routeIs('private') || request()->routeIs('profile.private'))
         <x-private-gate />
     @endunless
 

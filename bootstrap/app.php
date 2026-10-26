@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ReLockPrivateSettings;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -24,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // password changes take effect on every other device.
         $middleware->web(append: [
             AuthenticateSession::class,
+            ReLockPrivateSettings::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
