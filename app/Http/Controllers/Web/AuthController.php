@@ -181,6 +181,8 @@ class AuthController extends Controller
             'email' => $email ? Str::lower($email) : null,
             'phone' => HasPhoneNormalization::normalizePhone($phone),
             'password' => Hash::make((string) $request->input('password')),
+            'gender' => $request->input('gender'),
+            'birthdate' => $request->input('birthdate'),
             'agreed_to_terms_at' => $request->session()->get('agreed_to_terms_at'),
         ]);
 

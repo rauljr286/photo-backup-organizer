@@ -33,6 +33,8 @@ class AuthController extends Controller
             'name' => $request->name,
             'email' => $request->email ? strtolower((string) $request->email) : null,
             'password' => $request->password,
+            'gender' => $request->input('gender'),
+            'birthdate' => $request->input('birthdate'),
         ]);
 
         $token = $user->createToken('api-auth')->plainTextToken;

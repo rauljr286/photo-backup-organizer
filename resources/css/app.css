@@ -1372,6 +1372,23 @@ img {
     flex-wrap: wrap;
 }
 
+/* Optional personal details: side by side on desktop, stacked on mobile. */
+.details-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.1rem 0.75rem;
+}
+
+.details-grid__full {
+    grid-column: 1 / -1;
+}
+
+@media (max-width: 767.98px) {
+    .details-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
 .inline-form {
     display: inline;
 }
@@ -2900,6 +2917,21 @@ img {
     transform: translateY(-50%);
     display: inline-flex;
     color: var(--color-muted);
+    pointer-events: none;
+}
+
+.phone-field .field__input {
+    padding-left: 4.35rem;
+    min-height: 2.75rem;
+}
+
+.phone-field__prefix {
+    position: absolute;
+    left: 2.35rem;
+    top: 50%;
+    transform: translateY(-50%);
+    font-weight: 600;
+    color: var(--color-heading);
     pointer-events: none;
 }
 
@@ -6173,6 +6205,19 @@ img {
 .profile__card-title {
     margin: 0 0 1rem;
     font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--color-heading);
+}
+
+.profile__details-address {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.profile__details-heading {
+    margin: 0;
+    font-size: 0.95rem;
     font-weight: 700;
     color: var(--color-heading);
 }

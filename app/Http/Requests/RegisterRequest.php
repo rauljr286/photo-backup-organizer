@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\HasPhoneNormalization;
+use App\Models\User;
 use App\Rules\PhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rules\Password;
@@ -44,7 +45,10 @@ class RegisterRequest extends FormRequest
             'last_name' => ['nullable', 'string', 'max:100'],
             'suffix' => ['nullable', 'string', 'in:'.implode(',', self::SUFFIXES)],
             'email' => ['nullable', 'string', 'email', 'max:255', 'unique:users,email'],
+            'phone_local' => ['nullable', 'string', 'regex:/^9[0-9]{9}$/'],
             'phone' => ['nullable', 'string', new PhoneNumber, 'unique:users,phone'],
+            'gender' => ['nullable', 'in:'.implode(',', User::GENDERS)],
+            'birthdate' => ['nullable', 'date', 'before:today', 'after:-120 years'],
             'password' => [
                 'required',
                 'string',
@@ -73,6 +77,11 @@ class RegisterRequest extends FormRequest
             'email.email' => 'Please enter a valid email address.',
             'email.unique' => 'An account with this email already exists. Try logging in instead.',
             'phone.unique' => 'An account with this phone number already exists. Try logging in instead.',
+            'phone_local.regex' => 'Enter the 10-digit mobile number after +63 (for example, 9171234567).',
+            'gender.in' => 'Please choose a valid gender.',
+            'birthdate.date' => 'Please enter a valid birthdate.',
+            'birthdate.before' => 'Your birthdate must be in the past.',
+            'birthdate.after' => 'Your birthdate cannot be more than 120 years ago.',
             'password.required' => 'Please choose a password.',
             'password.min' => 'Your password must be at least 8 characters long.',
             'password.mixed' => 'Your password must contain at least one uppercase letter.',
@@ -106,9 +115,14 @@ class RegisterRequest extends FormRequest
             ]);
         }
 
+        $localPhone = $this->input('phone_local');
+        $phone = $localPhone !== null
+            ? HasPhoneNormalization::combinePhone('+63', $localPhone)
+            : HasPhoneNormalization::combinePhone(null, $this->input('phone'));
+
         $this->merge([
             'email' => $this->input('email') ? trim($this->input('email')) : null,
-            'phone' => HasPhoneNormalization::normalizePhone($this->input('phone')),
+            'phone' => HasPhoneNormalization::normalizePhone($phone),
         ]);
     }
 

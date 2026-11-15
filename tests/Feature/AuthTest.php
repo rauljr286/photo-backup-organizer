@@ -376,6 +376,72 @@ class AuthTest extends TestCase
         $this->assertSame('09171234567', $user->phone);
     }
 
+    public function test_a_user_can_register_and_sign_in_with_an_international_mobile_number(): void
+    {
+        $this->post('/register/agree');
+
+        $this->post('/register', [
+            'name' => 'International User',
+            'phone' => '+1 (555) 123-4567',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            '_auth_pane' => 'register',
+        ])->assertRedirect(route('dashboard'));
+
+        $user = User::where('phone', '+15551234567')->firstOrFail();
+        $this->assertNull($user->email);
+        $this->assertAuthenticatedAs($user);
+
+        $this->post('/logout');
+
+        $this->post('/login', [
+            'identifier' => '+1 555 123 4567',
+            'password' => 'Password123!',
+        ])->assertRedirect(route('dashboard'));
+
+        $this->assertAuthenticatedAs($user);
+    }
+
+    public function test_a_user_can_register_with_a_philippine_mobile_number(): void
+    {
+        $this->post('/register/agree');
+
+        $this->post('/register', [
+            'name' => 'Philippine Mobile User',
+            'phone_local' => '9171234567',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            '_auth_pane' => 'register',
+        ])->assertRedirect(route('dashboard'));
+
+        $this->assertDatabaseHas('users', ['phone' => '09171234567']);
+    }
+
+    public function test_the_registration_form_shows_the_plus_63_prefix(): void
+    {
+        $this->post('/register/agree');
+
+        $this->get('/register')
+            ->assertOk()
+            ->assertSee('name="phone_local"', false)
+            ->assertSee('+63', false);
+    }
+
+    public function test_the_web_registration_rejects_a_mobile_number_that_is_not_ten_digits(): void
+    {
+        $this->post('/register/agree');
+
+        $this->post('/register', [
+            'name' => 'Short Number',
+            'phone_local' => '917123456',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+            '_auth_pane' => 'register',
+        ])->assertSessionHasErrors(['phone_local']);
+
+        $this->assertGuest();
+    }
+
     public function test_registration_requires_an_email_or_mobile_number(): void
     {
         $this->post('/register/agree');

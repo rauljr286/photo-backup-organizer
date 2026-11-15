@@ -63,6 +63,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile/privacy', [DashboardController::class, 'settingsPrivacy'])->name('profile.privacy');
     Route::get('/profile/private', [DashboardController::class, 'settingsPrivate'])->name('profile.private');
     Route::patch('/settings/name', [DashboardController::class, 'updateName'])->name('settings.name');
+    Route::patch('/profile/details', [DashboardController::class, 'updateDetails'])->name('profile.details');
     Route::post('/settings/avatar', [DashboardController::class, 'updateAvatar'])->name('settings.avatar');
     Route::patch('/settings/password', [DashboardController::class, 'changePassword'])->name('settings.password');
     Route::post('/profile/logout-others', [DashboardController::class, 'logoutOtherSessions'])->name('profile.logout-others');

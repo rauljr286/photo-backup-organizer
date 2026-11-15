@@ -109,12 +109,18 @@
                                 </dd>
                             </div>
                             <div class="profile__row"><dt>Email</dt><dd>{{ $user->email ?: 'Not provided' }}</dd></div>
+                            <div class="profile__row"><dt>Gender</dt><dd>{{ $user->gender ?: 'Not set' }}</dd></div>
+                            <div class="profile__row"><dt>Birthdate</dt><dd>{{ $user->birthdate?->format('F j, Y') ?: 'Not set' }}</dd></div>
+                            <div class="profile__row"><dt>Address</dt><dd>{{ $user->formattedAddress() ?: 'Not set' }}</dd></div>
                             <div class="profile__row"><dt>Storage plan</dt><dd>{{ number_format($user->storage_limit_mb, 0) }} MB</dd></div>
                             <div class="profile__row"><dt>Photos</dt><dd>{{ $photoCount }} photo(s)</dd></div>
                             <div class="profile__row"><dt>Albums</dt><dd>{{ $albumCount }} album(s)</dd></div>
                             <div class="profile__row"><dt>Member since</dt><dd>{{ $user->created_at?->format('F j, Y') }}</dd></div>
                         </dl>
 
+                        <p class="profile__note">
+                            Archived photos stay safely stored until you choose to restore them. You can request full account deletion in the Security tab at any time.
+                        </p>
                     </section>
                 @endif
 

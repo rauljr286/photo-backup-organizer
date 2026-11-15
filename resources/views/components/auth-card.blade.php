@@ -11,7 +11,7 @@
     // (e.g. a cross-field rule) falls back to a summary at the top of the card.
     $inlineErrorKeys = [
         'name', 'first_name', 'middle_name', 'last_name', 'suffix',
-        'email', 'phone',
+        'email', 'phone', 'phone_local',
         'password', 'password_confirmation',
         'identifier', 'agree',
     ];
@@ -239,16 +239,51 @@
                         @enderror
                     </div>
 
+                    <div class="details-grid" role="group" aria-label="Personal details (optional)">
+                        <div class="field">
+                            <label class="field__label" for="gender">Gender</label>
+                            <select class="field__input" id="gender" name="gender"
+                                    @error('gender') aria-invalid="true" aria-describedby="gender-error" @enderror>
+                                <option value="">Select gender</option>
+                                @foreach (\App\Models\User::GENDERS as $genderOption)
+                                    <option value="{{ $genderOption }}" @selected(old('gender') === $genderOption)>{{ $genderOption }}</option>
+                                @endforeach
+                            </select>
+                            <p class="field__hint">Optional.</p>
+                            @error('gender')
+                                <p class="field__error" id="gender-error">{{ $message }}</p>
+                            @enderror
+                        </div>
+
+                        <div class="field">
+                            <label class="field__label" for="birthdate">Birthdate</label>
+                            <input class="field__input" id="birthdate" type="date" name="birthdate"
+                                   value="{{ old('birthdate') }}" max="{{ now()->format('Y-m-d') }}"
+                                   @error('birthdate') aria-invalid="true" aria-describedby="birthdate-error" @enderror>
+                            <p class="field__hint">Optional.</p>
+                            @error('birthdate')
+                                <p class="field__error" id="birthdate-error">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
+
                     <div class="field">
                         <label class="field__label" for="phone">Mobile number</label>
-                        <div class="field__control">
+                        <div class="field__control phone-field">
                             <span class="field__icon">{!! $phoneIcon !!}</span>
-                            <input class="field__input" id="phone" type="tel" name="phone" value="{{ old('phone') }}"
-                                   autocomplete="tel" placeholder="09XXXXXXXXX or +639XXXXXXXXX"
-                                   aria-describedby="phone-hint"
-                                   @error('phone') aria-invalid="true" aria-describedby="phone-hint phone-error" @enderror>
+                            <span class="phone-field__prefix" aria-hidden="true">+63</span>
+                            <input class="field__input" id="phone" type="tel" name="phone_local" value="{{ old('phone_local') }}"
+                                   autocomplete="tel" inputmode="numeric" maxlength="10"
+                                   @if ($errors->has('phone_local') || $errors->has('phone'))
+                                       aria-invalid="true" aria-describedby="phone-hint phone-local-error phone-error"
+                                   @else
+                                       aria-describedby="phone-hint"
+                                   @endif>
                         </div>
-                        <p class="field__hint" id="phone-hint">Provide an email, a mobile number, or both.</p>
+                        <p class="field__hint" id="phone-hint">Enter the 10-digit mobile number after +63. Provide an email, a mobile number, or both.</p>
+                        @error('phone_local')
+                            <p class="field__error" id="phone-local-error">{{ $message }}</p>
+                        @enderror
                         @error('phone')
                             <p class="field__error" id="phone-error">{{ $message }}</p>
                         @enderror

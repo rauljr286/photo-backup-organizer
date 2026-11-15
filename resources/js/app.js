@@ -1660,10 +1660,10 @@ function initUserMenu() {
             setOpen(menu, next);
         });
 
-        // Following a link dismisses the menu; the theme toggle and the
-        // sign-out button intentionally keep it open.
+        // Any menu action dismisses the menu, including the theme toggle
+        // and sign out, so it never lingers over the page.
         panel.addEventListener('click', (e) => {
-            if (e.target.closest('a')) setOpen(menu, false);
+            if (e.target.closest('a, button')) setOpen(menu, false);
         });
     });
 

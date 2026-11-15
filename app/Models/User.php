@@ -12,12 +12,19 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'phone', 'password', 'private_password', 'storage_limit_mb', 'avatar_path', 'agreed_to_terms_at', 'provider', 'provider_id'])]
+#[Fillable(['name', 'email', 'phone', 'password', 'private_password', 'storage_limit_mb', 'avatar_path', 'agreed_to_terms_at', 'provider', 'provider_id', 'gender', 'birthdate', 'country', 'province', 'city_municipality', 'barangay', 'street'])]
 #[Hidden(['password', 'private_password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
+
+    /**
+     * The gender options accepted by the registration and profile forms.
+     *
+     * @var array<int, string>
+     */
+    public const GENDERS = ['Male', 'Female', 'Other', 'Prefer not to say'];
 
     /**
      * Default attribute values so a freshly created user always knows its
@@ -43,6 +50,7 @@ class User extends Authenticatable
             'storage_limit_mb' => 'integer',
             'agreed_to_terms_at' => 'datetime',
             'deletion_requested_at' => 'datetime',
+            'birthdate' => 'date',
         ];
     }
 
@@ -61,6 +69,23 @@ class User extends Authenticatable
         }
 
         return route('avatar', ['user' => $this->id], absolute: true);
+    }
+
+    /**
+     * The saved address as a single line, skipping any empty parts. Returns
+     * null when the user has not filled in any address field.
+     */
+    public function formattedAddress(): ?string
+    {
+        $parts = collect([
+            $this->street,
+            $this->barangay,
+            $this->city_municipality,
+            $this->province,
+            $this->country,
+        ])->filter(fn ($part) => filled($part));
+
+        return $parts->isEmpty() ? null : $parts->implode(', ');
     }
 
     /**

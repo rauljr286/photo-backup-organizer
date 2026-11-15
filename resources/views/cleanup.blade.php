@@ -46,7 +46,7 @@
             <h2 class="panel__heading" id="duplicates-heading">Duplicate photos</h2>
 
             @if ($duplicates->isEmpty())
-                
+                <p class="empty-note">No duplicates found. If you spot a match, check the largest photos first.</p>
             @else
                 @foreach ($duplicates as $group)
                     <div class="duplicate-group">
@@ -70,7 +70,7 @@
             <h2 class="panel__heading" id="largest-heading">Largest photos</h2>
 
             @if ($largest->isEmpty())
-                
+                <p class="empty-note">No photos uploaded yet.</p>
             @else
                 <ul class="photo-row-list">
                     @foreach ($largest as $index => $photo)
@@ -92,7 +92,7 @@
             <h2 class="panel__heading" id="albums-heading">Not in any album</h2>
 
             @if ($notInAlbum->isEmpty())
-                
+                <p class="empty-note">Every photo is part of an album. Nice work.</p>
             @else
                 <ul class="photo-row-list">
                     @foreach ($notInAlbum as $photo)
@@ -114,7 +114,7 @@
             <h2 class="panel__heading" id="description-heading">Missing description</h2>
 
             @if ($missingDescription->isEmpty())
-                
+                <p class="empty-note">Every photo has a written description.</p>
             @else
                 <ul class="photo-row-list">
                     @foreach ($missingDescription as $photo)

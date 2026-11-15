@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Concerns\HandlesPhotoUploads;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StorePhotoRequest;
+use App\Http\Requests\UpdateProfileDetailsRequest;
 use App\Models\Photo;
 use App\Services\PhotoStorageService;
 use App\Support\PrivateGallery;
@@ -331,6 +332,18 @@ class DashboardController extends Controller
         }
 
         return back()->with('status', 'Your name has been updated.');
+    }
+
+    /**
+     * Update the signed-in user's optional personal details and address.
+     */
+    public function updateDetails(UpdateProfileDetailsRequest $request): RedirectResponse
+    {
+        $user = $request->user();
+        $user->fill($request->validated());
+        $user->save();
+
+        return back()->with('status', 'Your personal details have been updated.');
     }
 
     /**
