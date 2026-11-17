@@ -12,6 +12,11 @@
             </div>
             @if ($mode === 'gallery')
                 <div class="section-head__actions">
+                    @if ($archived)
+                        <a class="btn btn--ghost" href="{{ route('private') }}">Back to gallery</a>
+                    @else
+                        <a class="btn btn--ghost" href="{{ route('private', ['archived' => 1]) }}">View archived</a>
+                    @endif
                     <form method="POST" action="{{ route('private.lock') }}" class="inline-form">
                         @csrf
                         <button type="submit" class="btn btn--primary">Lock gallery</button>
@@ -141,7 +146,9 @@
                 </details>
             </div>
         @else
-            <x-upload-dropzone :url="route('private.photos.store')" :private="true"></x-upload-dropzone>
+            @unless ($archived)
+                <x-upload-dropzone :url="route('private.photos.store')" :private="true"></x-upload-dropzone>
+            @endunless
 
             <section class="photo-section private-gallery" id="photo-section" aria-labelledby="private-grid-heading">
                 <h2 class="visually-hidden" id="private-grid-heading">Your private photos</h2>
@@ -155,7 +162,7 @@
 
                 @if ($photos->hasMorePages())
                     <div class="grid-sentinel" data-infinite-scroll
-                         data-page-url="{{ route('private.photos.page') }}"
+                         data-page-url="{{ route('private.photos.page', $archived ? ['archived' => 1] : []) }}"
                          data-next-page="{{ $photos->currentPage() + 1 }}"
                          data-has-more="true" aria-live="polite">
                         <span class="grid-sentinel__spinner" aria-hidden="true"></span>
@@ -169,9 +176,13 @@
     <div class="bulk-bar" id="bulk-bar" role="region" aria-label="Bulk actions" hidden>
         <p><strong id="bulk-count">0</strong> selected</p>
         <div class="bulk-bar__actions">
-            <button type="button" class="btn btn--primary btn--sm" id="download-selected" data-url="{{ route('photos.download-selected') }}">Download selected</button>
+            <button type="button" class="btn btn--primary btn--sm" id="download-selected" data-url="{{ route('photos.download-selected') }}" data-private="1">Download selected</button>
             <button type="button" class="btn btn--primary btn--sm" id="edit-selected">Edit details</button>
-            <button type="button" class="btn btn--primary btn--sm" id="archive-selected">Archive selected</button>
+            @if ($archived)
+                <button type="button" class="btn btn--primary btn--sm" id="restore-selected">Restore selected</button>
+            @else
+                <button type="button" class="btn btn--primary btn--sm" id="archive-selected">Archive selected</button>
+            @endif
             <button type="button" class="btn btn--ghost btn--sm" id="clear-selected">Clear selection</button>
         </div>
     </div>

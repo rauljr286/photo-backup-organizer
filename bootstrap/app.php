@@ -14,11 +14,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // The app runs behind the Railway HTTP proxy, which forwards the
-        // original client IP, scheme and host in its request headers. Trust all
-        // proxies here so redirects, URLs, sessions and request()->ip() reflect
-        // the real client instead of the proxy.
-        $middleware->trustProxies(at: '*');
+        $trustedProxies = env('TRUSTED_PROXIES');
+
+        if (filled($trustedProxies)) {
+            $middleware->trustProxies(at: array_map('trim', explode(',', (string) $trustedProxies)));
+        }
 
         // Invalidate sessions whose stored password hash no longer matches the
         // user's current password. This makes "log out other sessions" and

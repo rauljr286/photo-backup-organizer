@@ -7,6 +7,7 @@ use App\Models\Photo;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -195,6 +196,33 @@ class ProfilePagesTest extends TestCase
 
         $response->assertRedirect('/profile/security');
         $response->assertSessionHas('status');
+    }
+
+    public function test_changing_the_password_enforces_the_full_password_rule(): void
+    {
+        $user = User::factory()->create(['password' => 'correct-horse-staple']);
+
+        foreach (['short1!', 'alllowercase1!', 'NOLOWERCASE1!', 'NoNumbers!', 'NoSymbols123'] as $weak) {
+            $this->actingAs($user)
+                ->patch('/settings/password', [
+                    'current_password' => 'correct-horse-staple',
+                    'password' => $weak,
+                    'password_confirmation' => $weak,
+                ])
+                ->assertSessionHasErrors('password');
+        }
+
+        $this->actingAs($user)
+            ->from('/profile/security')
+            ->patch('/settings/password', [
+                'current_password' => 'correct-horse-staple',
+                'password' => 'BrandNewPass1!',
+                'password_confirmation' => 'BrandNewPass1!',
+            ])
+            ->assertRedirect('/profile/security')
+            ->assertSessionHas('status');
+
+        $this->assertTrue(Hash::check('BrandNewPass1!', $user->fresh()->password));
     }
 
     private function upload(User $user, string $name, int $width, int $height): Photo

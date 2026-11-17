@@ -49,7 +49,7 @@
                     </li>
                 </ul>
 
-                <a href="{{ $ctaHref }}" class="btn btn--primary landing-cta" id="landing-get-started">
+                <a href="{{ $ctaHref }}" class="btn btn--primary landing-cta" id="landing-get-started" @if ($authenticated) data-authenticated="1" @endif>
                     {{ $ctaLabel }}
                     <span class="landing-cta__arrow" aria-hidden="true">&rarr;</span>
                 </a>

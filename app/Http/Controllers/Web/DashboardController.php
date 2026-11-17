@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\Validation\ValidationException;
 
 class DashboardController extends Controller
@@ -428,11 +429,10 @@ class DashboardController extends Controller
     {
         $request->validate([
             'current_password' => ['required', 'string'],
-            'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'password' => ['required', 'string', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
         ], [
             'current_password.required' => 'Please enter your current password.',
             'password.required' => 'Please choose a new password.',
-            'password.min' => 'Your new password must be at least 8 characters long.',
             'password.confirmed' => 'The password confirmation does not match.',
         ]);
 

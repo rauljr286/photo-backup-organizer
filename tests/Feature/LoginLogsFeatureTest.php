@@ -29,6 +29,18 @@ class LoginLogsFeatureTest extends TestCase
         $this->assertSame($agent, $log->user_agent);
     }
 
+    public function test_forwarded_for_header_is_ignored_when_no_proxies_are_trusted(): void
+    {
+        $user = User::factory()->create(['password' => 'Password123!']);
+
+        $this->withServerVariables([
+            'REMOTE_ADDR' => '192.168.1.10',
+            'HTTP_X_FORWARDED_FOR' => '1.2.3.4',
+        ])->post('/login', ['identifier' => $user->email, 'password' => 'Password123!']);
+
+        $this->assertSame('192.168.1.10', LoginLog::first()->ip_address);
+    }
+
     public function test_failed_login_creates_failed_row(): void
     {
         $user = User::factory()->create(['password' => 'Password123!']);

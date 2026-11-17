@@ -10,6 +10,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -27,9 +28,10 @@ class PrivateController extends Controller
      * exists yet, an unlock screen while locked, or the photo grid once
      * unlocked.
      */
-    public function index(Request $request): View
+    public function index(Request $request): View|Response
     {
         $user = $request->user();
+        $archived = $request->boolean('archived');
 
         $mode = match (true) {
             ! $user->hasPrivatePassword() => 'setup',
@@ -37,13 +39,24 @@ class PrivateController extends Controller
             default => 'gallery',
         };
 
-        return view('private.index', [
+        $view = view('private.index', [
             'user' => $user,
             'mode' => $mode,
+            'archived' => $archived,
             'photos' => $mode === 'gallery'
-                ? $user->privatePhotos()->orderByDesc('created_at')->orderByDesc('id')->paginate(24)
+                ? $user->privatePhotos()
+                    ->when($archived, fn ($query) => $query->whereNotNull('archived_at'), fn ($query) => $query->whereNull('archived_at'))
+                    ->orderByDesc('created_at')
+                    ->orderByDesc('id')
+                    ->paginate(24)
                 : null,
         ]);
+
+        if ($mode === 'gallery') {
+            return response()->view('private.index', $view->getData())->header('Cache-Control', 'no-store, private');
+        }
+
+        return $view;
     }
 
     /**
@@ -188,6 +201,7 @@ class PrivateController extends Controller
         }
 
         $paginator = $user->privatePhotos()
+            ->when($request->boolean('archived'), fn ($query) => $query->whereNotNull('archived_at'), fn ($query) => $query->whereNull('archived_at'))
             ->orderByDesc('created_at')
             ->orderByDesc('id')
             ->paginate(DashboardController::PHOTOS_PER_PAGE);

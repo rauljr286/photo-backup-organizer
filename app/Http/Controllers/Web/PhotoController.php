@@ -10,6 +10,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -22,7 +23,7 @@ class PhotoController extends Controller
         protected PhotoStorageService $photos,
     ) {}
 
-    public function show(Request $request, Photo $photo): View
+    public function show(Request $request, Photo $photo): View|Response
     {
         $this->authorizePhoto($request, $photo);
 
@@ -35,7 +36,7 @@ class PhotoController extends Controller
 
         $index = array_search($photo->id, $siblings, true);
 
-        return view('photos.show', [
+        $view = view('photos.show', [
             'user' => $request->user(),
             'photo' => $photo,
             'prevPhoto' => is_int($index) && isset($siblings[$index - 1])
@@ -47,6 +48,12 @@ class PhotoController extends Controller
             'albums' => $photo->isPrivate() ? collect() : $request->user()->albums()->orderBy('name')->get(),
             'photoAlbums' => $photo->isPrivate() ? collect() : $photo->albums()->pluck('albums.id'),
         ]);
+
+        if ($photo->isPrivate()) {
+            return response()->view('photos.show', $view->getData())->header('Cache-Control', 'no-store, private');
+        }
+
+        return $view;
     }
 
     /**
@@ -63,13 +70,18 @@ class PhotoController extends Controller
         }
 
         $download = $request->query('download') === '1';
+        $headers = [
+            'Content-Type' => $photo->mime_type ?? 'application/octet-stream',
+        ];
+
+        if ($photo->isPrivate()) {
+            $headers['Cache-Control'] = 'no-store, private';
+        }
 
         return Storage::disk($disk)->response(
             $photo->file_path,
             $photo->original_filename ?: basename($photo->file_path),
-            [
-                'Content-Type' => $photo->mime_type ?? 'application/octet-stream',
-            ],
+            $headers,
             $download ? 'attachment' : 'inline',
         );
     }
@@ -85,10 +97,16 @@ class PhotoController extends Controller
         $disk = config('photobackup.photo_disk');
 
         if (filled($photo->thumbnail_path) && Storage::disk($disk)->exists($photo->thumbnail_path)) {
+            $headers = ['Content-Type' => 'image/jpeg'];
+
+            if ($photo->isPrivate()) {
+                $headers['Cache-Control'] = 'no-store, private';
+            }
+
             return Storage::disk($disk)->response(
                 $photo->thumbnail_path,
                 basename($photo->thumbnail_path),
-                ['Content-Type' => 'image/jpeg'],
+                $headers,
             );
         }
 
@@ -108,12 +126,18 @@ class PhotoController extends Controller
             abort(404, 'Photo file not found on disk.');
         }
 
+        $headers = [
+            'Content-Type' => $photo->mime_type ?? 'application/octet-stream',
+        ];
+
+        if ($photo->isPrivate()) {
+            $headers['Cache-Control'] = 'no-store, private';
+        }
+
         return Storage::disk($disk)->response(
             $photo->file_path,
             $photo->original_filename ?: basename($photo->file_path),
-            [
-                'Content-Type' => $photo->mime_type ?? 'application/octet-stream',
-            ],
+            $headers,
             'attachment',
         );
     }
@@ -123,6 +147,12 @@ class PhotoController extends Controller
      */
     public function downloadSelected(Request $request): BinaryFileResponse|RedirectResponse
     {
+        $private = $request->boolean('private');
+
+        if ($private && ! PrivateGallery::isUnlocked($request)) {
+            abort(403, 'This photo is in your private gallery. Unlock it to view this photo.');
+        }
+
         $ids = (array) $request->input('ids', []);
 
         if ($ids === []) {
@@ -137,7 +167,7 @@ class PhotoController extends Controller
             ]);
         }
 
-        $photos = $request->user()->photos()->whereIn('photos.id', $ids)->where('is_private', false)->get();
+        $photos = $request->user()->photos()->whereIn('photos.id', $ids)->where('is_private', $private)->get();
 
         $zip = $this->photos->buildZip($photos, 'photos');
 
@@ -246,17 +276,25 @@ class PhotoController extends Controller
             'alt_text' => ['nullable', 'string', 'max:500'],
             'tags' => ['nullable', 'string', 'max:255'],
             'album' => ['nullable', 'integer'],
+            'private' => ['nullable', 'boolean'],
         ], [
             'ids.required' => 'Select at least one photo.',
             'ids.max' => 'You can edit up to 200 photos at a time.',
         ]);
+
+        $private = (bool) ($validated['private'] ?? false);
+
+        if ($private && ! PrivateGallery::isUnlocked($request)) {
+            abort(403, 'This photo is in your private gallery. Unlock it to view this photo.');
+        }
 
         $result = $this->photos->applyBulkUpdate(
             $request->user(),
             $validated['ids'],
             $validated['alt_text'] ?? null,
             $validated['tags'] ?? null,
-            array_key_exists('album', $validated) ? $validated['album'] : null,
+            $private ? null : (array_key_exists('album', $validated) ? $validated['album'] : null),
+            $private,
         );
 
         if ($request->wantsJson()) {

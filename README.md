@@ -86,7 +86,6 @@ raised above the defaults. Set these in your active `php.ini` (in Laragon:
    npm install
    npm run build
    php artisan migrate
-   php artisan storage:link
    ```
 
 4. **Serve the app** — start Laragon (Apache/Nginx + MySQL), then visit the vhost, or run:
@@ -103,10 +102,12 @@ Beyond the standard Laravel keys, the app reads:
 
 | Variable                     | Default                | Purpose                                             |
 | ---------------------------- | ---------------------- | --------------------------------------------------- |
+| `PHOTOS_DISK`                | `public`               | Disk that stores photo originals and thumbnails. Every file is streamed through the app, so the disk stays private. |
 | `PHOTOS_CLOUD_DISK`          | *(empty)*              | Disk name for backups, e.g. `s3`. Empty = local mirror. |
 | `PHOTOS_LOCAL_MIRROR_DISK`   | `local`                | Disk used to mirror backups when no cloud disk is set. |
 | `PHOTOS_MAX_UPLOAD_MB`       | `20`                   | Maximum size of a single uploaded photo (MB).       |
 | `PHOTOS_SUPPORT_EMAIL`       | `support@example.com`  | Support address shown on legal pages.               |
+| `TRUSTED_PROXIES`            | *(empty)*              | Comma-separated proxy IPs trusted for forwarded headers. Empty = trust none. |
 
 ### Enabling real cloud backup
 
@@ -140,8 +141,9 @@ Free-tier notes:
   a minute to restart on the next request (the `/up` health route handles
   Render's health checks).
 - Uploads are stored in the container's ephemeral disk, so they are lost on a
-  new deploy. For persistence set `PHOTOS_CLOUD_DISK=s3` and the matching
-  `AWS_*` keys (see "Enabling real cloud backup").
+  new deploy. For persistence set `PHOTOS_DISK=s3` and the matching `AWS_*`
+  keys, and use `PHOTOS_CLOUD_DISK=s3` for the backup mirror (see "Enabling
+  real cloud backup").
 
 ## Deploying to Railway
 
@@ -152,7 +154,9 @@ the image builds the front-end assets and the container runs the migrations
 itself (details below). Railway still serves the app behind its own proxy with
 HTTPS, and the repo is configured for that:
 
-- `bootstrap/app.php` trusts the proxy headers (`trustProxies(at: '*')`).
+- `bootstrap/app.php` trusts forwarded headers only for the proxies listed in
+  `TRUSTED_PROXIES` (comma-separated). Set it to Railway's proxy address; when
+  it is empty, no proxy headers are trusted.
 - `AppServiceProvider` forces the `https` scheme in production so generated
   URLs never become mixed content.
 - The image raises the PHP upload limits (via `uploads.ini`:
@@ -162,12 +166,12 @@ HTTPS, and the repo is configured for that:
   Vite assets into `public/build` during the image build.
 - On **every container start** the entrypoint (`docker/entrypoint.sh`): makes
   Apache listen on Railway's `PORT`, re-creates and chowns the storage tree
-  (a mounted Volume comes up root-owned), runs `php artisan migrate --force`
-  and `php artisan storage:link --force`.
-- Photos, thumbnails and avatars are stored via the `public` disk
-  (`storage/app/public`) with relative paths, and are streamed back through
-  controller routes backed by the Storage facade — nothing depends on a
-  symlink surviving the build.
+  (a mounted Volume comes up root-owned), runs `php artisan migrate --force`,
+  and starts `php artisan schedule:work` in the background.
+- Photos, thumbnails and avatars are stored via the `PHOTOS_DISK` disk
+  (`storage/app/public` by default) with relative paths, and are streamed back
+  through controller routes backed by the Storage facade. There is **no
+  `public/storage` symlink**, so the files can never be fetched directly.
 - There are **no queued jobs or queued mail listeners**, so `QUEUE_CONNECTION=sync`
   runs everything (thumbnail generation, mirror backup, login logging) inside
   the request — no worker service is required.
@@ -236,11 +240,10 @@ leave **Settings → Deploy** empty:
 - `npm run build` runs **during the image build**, so `public/build` is
   produced inside the image (it is git-ignored and never committed).
 - `php artisan migrate --force` runs **at container start** from
-  `docker/entrypoint.sh`, together with `storage:link --force`.
+  `docker/entrypoint.sh`, which also starts the scheduler in the background.
 
 Setting a build command or pre-deploy command is unnecessary (and the
-Railpack-era `npm run build && php artisan storage:link --force` commands no
-longer apply).
+Railpack-era `npm run build` commands no longer apply).
 
 ### 4. Public domain
 
@@ -257,8 +260,9 @@ during a deploy is lost on the next deploy. To keep users' uploads, either:
   `/var/www/html`, so this is Laravel's `storage_path('app')`). The startup
   script re-creates and chowns the storage tree on every boot, so the
   root-owned volume is writable by PHP; or
-- **Use an S3-compatible bucket**: set `PHOTOS_CLOUD_DISK=s3`, fill in the
-  `AWS_*` variables, and install the Flysystem adapter
+- **Use an S3-compatible bucket**: set `PHOTOS_DISK=s3` for originals and
+  `PHOTOS_CLOUD_DISK=s3` for the backup mirror, fill in the `AWS_*` variables,
+  and install the Flysystem adapter
   (`composer require league/flysystem-aws-s3-v3`).
 
 Without either, avatars, photos and thumbnails survive until the next deploy

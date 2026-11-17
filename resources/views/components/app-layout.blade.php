@@ -15,7 +15,7 @@
     <div class="app-shell">
         <header class="topbar">
             <div class="topbar__inner">
-                <a href="{{ route('dashboard') }}" class="topbar__brand brand" aria-label="Photo Backup Organizer home">
+                <a href="{{ auth()->check() ? route('dashboard') : route('home') }}" class="topbar__brand brand" aria-label="Photo Backup Organizer home">
                     <svg class="brand__icon" viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
                         <path vector-effect="non-scaling-stroke" transform="translate(12 5) scale(0.5) translate(-12 -11)" d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/>
                         <path d="M5 11.5h3.6l1.2-2h4.4l1.2 2H19a2 2 0 0 1 2 2v4.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V13.5a2 2 0 0 1 2-2Z"/>
@@ -25,9 +25,14 @@
                 </a>
 
                 <div class="topbar__nav">
-                    <x-nav-tabs></x-nav-tabs>
+                    @auth
+                        <x-nav-tabs></x-nav-tabs>
+                    @else
+                        <a href="{{ route('login') }}" class="tabnav__link">Sign in</a>
+                    @endauth
                 </div>
 
+                @auth
                 @php
                     $account = config('navigation.account');
                 @endphp
@@ -66,6 +71,11 @@
                         </div>
                     </div>
                 </div>
+                @else
+                <div class="topbar__account">
+                    <a href="{{ route('register') }}" class="btn btn--sm btn--primary">Get started</a>
+                </div>
+                @endauth
             </div>
         </header>
 
@@ -108,64 +118,70 @@
             </main>
         </div>
 
-        <x-mobile-nav />
+        @auth
+            <x-mobile-nav />
+        @endauth
     </div>
 
     <x-flash-region></x-flash-region>
 
-    @unless (request()->routeIs('private') || request()->routeIs('profile.private'))
-        <x-private-gate />
-    @endunless
+    @auth
+        @unless (request()->routeIs('private') || request()->routeIs('profile.private'))
+            <x-private-gate />
+        @endunless
 
-    <dialog class="dialog" id="bulk-archive-dialog" aria-labelledby="bulk-archive-title" aria-describedby="bulk-archive-desc">
-        <h2 class="dialog__title" id="bulk-archive-title">Archive selected photos?</h2>
-        <p id="bulk-archive-desc">
-            <strong id="bulk-archive-name"></strong> photo(s) will move to your archive where you can
-            restore them at any time.
-        </p>
-        <form method="POST" id="bulk-archive-form" class="dialog__actions">
-            @csrf
-            <button type="button" class="btn btn--ghost js-dialog-close" data-target="bulk-archive-dialog">Cancel</button>
-            <button type="submit" class="btn btn--danger">Archive</button>
-        </form>
-    </dialog>
+        <dialog class="dialog" id="bulk-archive-dialog" aria-labelledby="bulk-archive-title" aria-describedby="bulk-archive-desc">
+            <h2 class="dialog__title" id="bulk-archive-title">Archive selected photos?</h2>
+            <p id="bulk-archive-desc">
+                <strong id="bulk-archive-name"></strong> photo(s) will move to your archive where you can
+                restore them at any time.
+            </p>
+            <form method="POST" id="bulk-archive-form" class="dialog__actions">
+                @csrf
+                <button type="button" class="btn btn--ghost js-dialog-close" data-target="bulk-archive-dialog">Cancel</button>
+                <button type="submit" class="btn btn--danger">Archive</button>
+            </form>
+        </dialog>
 
-    <dialog class="dialog" id="bulk-edit-dialog" aria-labelledby="bulk-edit-title" aria-describedby="bulk-edit-desc">
-        <h2 class="dialog__title" id="bulk-edit-title">Edit selected photos</h2>
-        <p id="bulk-edit-desc">Updating <strong id="bulk-edit-name"></strong> photo(s) - the details below replace the
-            current description and tags on every selected photo.</p>
+        <dialog class="dialog" id="bulk-edit-dialog" aria-labelledby="bulk-edit-title" aria-describedby="bulk-edit-desc">
+            <h2 class="dialog__title" id="bulk-edit-title">Edit selected photos</h2>
+            <p id="bulk-edit-desc">Updating <strong id="bulk-edit-name"></strong> photo(s) - the details below replace the
+                current description and tags on every selected photo.</p>
 
-        <form method="POST" id="bulk-edit-form" class="form" data-url="{{ route('photos.bulk-update') }}">
-            @csrf
+            <form method="POST" id="bulk-edit-form" class="form" data-url="{{ route('photos.bulk-update') }}" data-private="{{ request()->routeIs('private') ? '1' : '0' }}">
+                @csrf
 
-            <div class="field">
-                <label class="field__label" for="bulk-alt-text">Description (alt text)</label>
-                <textarea class="field__input" id="bulk-alt-text" name="alt_text" rows="3"
-                          placeholder="Describe what is happening in these photos"></textarea>
-            </div>
+                <div class="field">
+                    <label class="field__label" for="bulk-alt-text">Description (alt text)</label>
+                    <textarea class="field__input" id="bulk-alt-text" name="alt_text" rows="3"
+                              placeholder="Describe what is happening in these photos"></textarea>
+                </div>
 
-            <div class="field">
-                <label class="field__label" for="bulk-tags">Tags (replaces the tags on all selected)</label>
-                <input class="field__input" id="bulk-tags" name="tags" type="text"
-                       placeholder="e.g. family, vacation, 2025">
-                <p class="field__hint">Separate tags with commas.</p>
-            </div>
+                <div class="field">
+                    <label class="field__label" for="bulk-tags">Tags (replaces the tags on all selected)</label>
+                    <input class="field__input" id="bulk-tags" name="tags" type="text"
+                           placeholder="e.g. family, vacation, 2025">
+                    <p class="field__hint">Separate tags with commas.</p>
+                </div>
 
-            <div class="field">
-                <label class="field__label" for="bulk-album">Add to album</label>
-                <select class="field__input" id="bulk-album" name="album">
-                    <option value="">No album change</option>
-                    @foreach (auth()->user()->albums()->orderBy('name')->get() as $album)
-                        <option value="{{ $album->id }}">{{ $album->name }}</option>
-                    @endforeach
-                </select>
-            </div>
+                @unless (request()->routeIs('private'))
+                    <div class="field">
+                        <label class="field__label" for="bulk-album">Add to album</label>
+                        <select class="field__input" id="bulk-album" name="album">
+                            <option value="">No album change</option>
+                            @foreach (auth()->user()->albums()->orderBy('name')->get() as $album)
+                                <option value="{{ $album->id }}">{{ $album->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endunless
 
-            <div class="dialog__actions">
-                <button type="button" class="btn btn--ghost js-dialog-close" data-target="bulk-edit-dialog">Cancel</button>
-                <button type="submit" class="btn btn--primary">Save changes</button>
-            </div>
-        </form>
-    </dialog>
+                <div class="dialog__actions">
+                    <button type="button" class="btn btn--ghost js-dialog-close" data-target="bulk-edit-dialog">Cancel</button>
+                    <button type="submit" class="btn btn--primary">Save changes</button>
+                </div>
+            </form>
+        </dialog>
+    @endauth
 </body>
 </html>

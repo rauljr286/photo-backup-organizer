@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Album;
 use App\Models\Photo;
 use App\Models\User;
 use App\Support\PrivateGallery;
@@ -483,6 +484,125 @@ class PrivateGalleryTest extends TestCase
             ->get('/private')
             ->assertOk()
             ->assertDontSee('id="private-gate-dialog"', false);
+    }
+
+    public function test_the_api_cannot_read_private_photos(): void
+    {
+        $user = $this->userWithPrivatePassword();
+        $photo = $this->privatePhoto($user, 'api-secret.jpg');
+
+        $this->actingAs($user, 'sanctum')->getJson("/api/photos/{$photo->id}")->assertForbidden();
+        $this->actingAs($user, 'sanctum')->getJson("/api/photos/{$photo->id}/raw")->assertForbidden();
+        $this->actingAs($user, 'sanctum')->deleteJson("/api/photos/{$photo->id}")->assertForbidden();
+
+        $this->actingAs($user, 'sanctum')
+            ->getJson('/api/photos')
+            ->assertOk()
+            ->assertJsonCount(0, 'data');
+    }
+
+    public function test_private_photos_are_never_counted_in_albums(): void
+    {
+        $user = $this->userWithPrivatePassword();
+        $album = Album::create(['user_id' => $user->id, 'name' => 'Private-free']);
+        $photo = $this->privatePhoto($user, 'not-in-album.jpg');
+
+        $album->photos()->attach($photo);
+
+        $this->assertSame(0, $album->photoCount());
+        $this->assertSame(0, $album->photos()->count());
+
+        $this->actingAs($user)
+            ->post("/albums/{$album->id}/photos", ['photo_id' => $photo->id])
+            ->assertNotFound();
+    }
+
+    public function test_private_bulk_download_requires_the_gallery_to_be_unlocked(): void
+    {
+        $user = $this->userWithPrivatePassword();
+        $photo = $this->privatePhoto($user, 'zip-me.jpg');
+        Storage::disk('public')->put($photo->file_path, 'binary-data');
+
+        $this->actingAs($user)
+            ->post('/photos/download-selected', ['ids' => [$photo->id], 'private' => 1])
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->withSession([PrivateGallery::SESSION_KEY => true])
+            ->post('/photos/download-selected', ['ids' => [$photo->id], 'private' => 1])
+            ->assertOk()
+            ->assertHeader('content-type', 'application/zip');
+    }
+
+    public function test_private_bulk_edit_updates_private_photos_when_unlocked(): void
+    {
+        $user = $this->userWithPrivatePassword();
+        $photo = $this->privatePhoto($user, 'edit-me.jpg');
+
+        $this->actingAs($user)
+            ->postJson('/photos/bulk-update', [
+                'ids' => [$photo->id],
+                'alt_text' => 'A private memory',
+                'tags' => 'secret, family',
+                'private' => 1,
+            ])
+            ->assertForbidden();
+
+        $this->actingAs($user)
+            ->withSession([PrivateGallery::SESSION_KEY => true])
+            ->postJson('/photos/bulk-update', [
+                'ids' => [$photo->id],
+                'alt_text' => 'A private memory',
+                'tags' => 'secret, family',
+                'private' => 1,
+            ])
+            ->assertOk();
+
+        $photo->refresh();
+
+        $this->assertSame('A private memory', $photo->alt_text);
+        $this->assertSame(['secret', 'family'], $photo->tags);
+    }
+
+    public function test_archived_private_photos_are_hidden_from_the_gallery_and_restorable(): void
+    {
+        $user = $this->userWithPrivatePassword();
+        $photo = $this->privatePhoto($user, 'archived-private.jpg');
+        $photo->archived_at = now();
+        $photo->save();
+
+        $this->actingAs($user)
+            ->withSession([PrivateGallery::SESSION_KEY => true])
+            ->get('/private')
+            ->assertOk()
+            ->assertDontSee('data-photo-id="'.$photo->id.'"', false)
+            ->assertSee('View archived');
+
+        $this->actingAs($user)
+            ->withSession([PrivateGallery::SESSION_KEY => true])
+            ->get('/private?archived=1')
+            ->assertOk()
+            ->assertSee('data-photo-id="'.$photo->id.'"', false);
+
+        $this->actingAs($user)
+            ->withSession([PrivateGallery::SESSION_KEY => true])
+            ->post("/photos/{$photo->id}/unarchive")
+            ->assertRedirect();
+
+        $this->assertNull($photo->fresh()->archived_at);
+    }
+
+    public function test_private_photo_responses_are_not_cacheable(): void
+    {
+        $user = $this->userWithPrivatePassword();
+        $photo = $this->privatePhoto($user, 'no-store.jpg');
+        Storage::disk('public')->put($photo->file_path, 'binary-data');
+
+        $this->actingAs($user)
+            ->withSession([PrivateGallery::SESSION_KEY => true])
+            ->get("/photos/{$photo->id}/raw")
+            ->assertOk()
+            ->assertHeader('cache-control', 'no-store, private');
     }
 
     private function userWithPrivatePassword(string $password = 'secret-pass'): User

@@ -204,6 +204,7 @@ class DirectUploadService
             );
         } catch (Throwable $e) {
             Storage::disk($disk)->delete($finalPath);
+            Photo::query()->where('user_id', $user->id)->where('file_path', $finalPath)->delete();
             $this->discard($pending);
 
             throw $e;

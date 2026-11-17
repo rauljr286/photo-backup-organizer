@@ -23,10 +23,10 @@ mkdir -p \
     storage/logs
 chown -R www-data:www-data storage bootstrap/cache
 
-# Keep the schema in sync with the deployed code, then link public/storage.
-# --force replaces a link left over from a previous boot instead of aborting,
-# which would stop the container before Apache ever starts.
+# Keep the schema in sync with the deployed code.
 php artisan migrate --force
-php artisan storage:link --force
+
+# Run the scheduler in the background; Apache stays the foreground process.
+php artisan schedule:work > /dev/null 2>&1 &
 
 exec apache2-foreground

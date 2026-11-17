@@ -60,20 +60,13 @@ class SocialAuthController extends Controller
 
         $user = User::where('provider', $provider)->where('provider_id', $providerId)->first();
 
-        if (! $user && $email) {
-            $user = User::where('email', $email)->first();
+        if (! $user && $email && User::where('email', $email)->exists()) {
+            return redirect()->route('login')->withErrors([
+                'identifier' => 'An account already uses this email address. Sign in with your password first, then link '.ucfirst($provider).' from your account settings.',
+            ]);
         }
 
-        if ($user) {
-            // Link the provider to an existing (password) account the first
-            // time the user signs in with it.
-            if (! $user->provider) {
-                $user->forceFill([
-                    'provider' => $provider,
-                    'provider_id' => $providerId,
-                ])->save();
-            }
-        } else {
+        if (! $user) {
             $user = User::create([
                 'name' => $this->displayName($socialUser, $email),
                 'email' => $email,

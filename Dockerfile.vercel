@@ -27,7 +27,7 @@ RUN set -eux; \
         curl -fsSL https://raw.githubusercontent.com/mlocati/docker-php-extension-installer/master/install-php-extensions -o /usr/local/bin/install-php-extensions; \
         chmod +x /usr/local/bin/install-php-extensions; \
     fi; \
-    install-php-extensions intl zip gd exif pdo_mysql bcmath; \
+    install-php-extensions intl zip gd exif pdo_mysql pdo_pgsql bcmath; \
     cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
 # Upload limits. The app accepts photo batches, so the request body may be
@@ -128,4 +128,4 @@ USER www-data
 
 EXPOSE 80
 
-CMD ["frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile"]
+CMD ["sh", "-c", "php artisan migrate --force && exec frankenphp run --config /etc/frankenphp/Caddyfile"]

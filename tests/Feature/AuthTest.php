@@ -191,6 +191,24 @@ class AuthTest extends TestCase
         $this->assertSame(0, $user->tokens()->count());
     }
 
+    public function test_api_login_is_rate_limited(): void
+    {
+        $this->app['config']->set('cache.default', 'array');
+        $user = User::factory()->create(['password' => 'Password123!']);
+
+        foreach (range(1, 5) as $i) {
+            $this->postJson('/api/login', [
+                'identifier' => $user->email,
+                'password' => 'wrong-password',
+            ])->assertStatus(422);
+        }
+
+        $this->postJson('/api/login', [
+            'identifier' => $user->email,
+            'password' => 'Password123!',
+        ])->assertStatus(429);
+    }
+
     public function test_login_is_rate_limited_after_five_failed_attempts_and_recovers(): void
     {
         $this->app['config']->set('cache.default', 'array');
@@ -657,17 +675,19 @@ class AuthTest extends TestCase
         ]);
     }
 
-    public function test_social_callback_links_an_existing_account(): void
+    public function test_social_callback_does_not_auto_link_an_existing_email(): void
     {
         $user = User::factory()->create(['email' => 'jane@example.com']);
 
         $this->mockSocialiteUser('facebook', '998877', 'jane@example.com', 'Jane Doe');
 
-        $this->get(route('social.callback', 'facebook'))->assertRedirect(route('dashboard'));
+        $this->get(route('social.callback', 'facebook'))
+            ->assertRedirect(route('login'))
+            ->assertSessionHasErrors('identifier');
 
-        $this->assertAuthenticatedAs($user->fresh());
-        $this->assertSame('facebook', $user->fresh()->provider);
-        $this->assertSame('998877', $user->fresh()->provider_id);
+        $this->assertGuest();
+        $this->assertNull($user->fresh()->provider);
+        $this->assertNull($user->fresh()->provider_id);
         $this->assertDatabaseCount('users', 1);
     }
 

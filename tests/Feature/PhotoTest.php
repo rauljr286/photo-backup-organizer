@@ -6,6 +6,7 @@ use App\Models\Album;
 use App\Models\Photo;
 use App\Models\User;
 use App\Services\PhotoStorageService;
+use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -714,6 +715,75 @@ class PhotoTest extends TestCase
         $this->assertNotSame($original, Storage::disk('public')->get($fresh->file_path));
         $this->assertNotNull($fresh->thumbnail_path);
         Storage::disk('public')->assertExists($fresh->thumbnail_path);
+    }
+
+    public function test_rotating_a_photo_refreshes_its_hash_and_size(): void
+    {
+        $photo = $this->uploadFor($this->owner, 'hash-after-rotate.jpg', 320, 240);
+
+        $this->actingAs($this->owner)->post("/photos/{$photo->id}/rotate", ['direction' => 'right']);
+
+        $fresh = $photo->fresh();
+        $contents = Storage::disk('public')->get($fresh->file_path);
+
+        $this->assertSame(hash('sha256', $contents), $fresh->file_hash);
+        $this->assertSame(strlen($contents), $fresh->size_bytes);
+    }
+
+    public function test_zip_entries_are_sanitized_and_deduplicated(): void
+    {
+        $first = $this->uploadFor($this->owner, 'first-unique.jpg', 320, 240);
+        $second = $this->uploadFor($this->owner, 'second-unique.jpg', 321, 240);
+
+        $first->original_filename = '../../same.jpg';
+        $first->save();
+        $second->original_filename = 'same.jpg';
+        $second->save();
+
+        $response = $this->actingAs($this->owner)->post('/photos/download-selected', [
+            'ids' => [$first->id, $second->id],
+        ]);
+
+        $response->assertOk();
+        $names = $this->zipEntryNames($response);
+
+        $this->assertContains('same.jpg', $names);
+        $this->assertContains('same (2).jpg', $names);
+        $this->assertNotContains('../../same.jpg', $names);
+    }
+
+    public function test_a_failed_registration_removes_the_orphaned_file_and_row(): void
+    {
+        $service = $this->partialMock(PhotoStorageService::class, function ($mock): void {
+            $mock->shouldReceive('registerStoredFile')->andThrow(new \RuntimeException('boom'));
+        });
+
+        try {
+            $service->store($this->image(), $this->owner, null);
+            $this->fail('Expected the store call to throw.');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('boom', $e->getMessage());
+        }
+
+        $this->assertDatabaseCount('photos', 0);
+        $this->assertSame([], Storage::disk('public')->allFiles('photos'));
+    }
+
+    public function test_a_failed_cloud_backup_throws_instead_of_marking_the_photo_backed_up(): void
+    {
+        $photo = $this->uploadFor($this->owner, 'unbackable.jpg');
+        Storage::disk('public')->put($photo->file_path, 'binary-data');
+
+        $filesystem = \Mockery::mock(Filesystem::class);
+        $filesystem->shouldReceive('exists')->andReturn(true);
+        $filesystem->shouldReceive('readStream')->andReturn(fopen('php://memory', 'r'));
+        $filesystem->shouldReceive('put')->andReturn(false);
+
+        Storage::shouldReceive('disk')->andReturn($filesystem);
+
+        $this->expectException(\RuntimeException::class);
+
+        app(PhotoStorageService::class)->backupToCloud($photo);
     }
 
     public function test_rotating_a_photo_invalidates_its_cloud_backup(): void

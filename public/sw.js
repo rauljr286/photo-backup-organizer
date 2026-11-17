@@ -25,7 +25,7 @@
  *   - Everything else: network-first with cache fallback.
  */
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const SHELL_CACHE = `pbo-shell-${CACHE_VERSION}`;
 const PAGE_CACHE = `pbo-pages-${CACHE_VERSION}`;
 const MEDIA_CACHE = `pbo-media-${CACHE_VERSION}`;
@@ -81,14 +81,31 @@ self.addEventListener('message', (event) => {
     }
 });
 
+const isPrivatePath = (path) => path === '/private' || path.startsWith('/private/');
+
+const isCacheable = (response) => {
+    if (!response || !response.ok || response.type === 'opaque') return false;
+    const cacheControl = response.headers.get('cache-control') || '';
+    return !/no-store|private/i.test(cacheControl);
+};
+
 const putIfCacheable = async (cacheName, request, response) => {
-    if (!response || !response.ok || response.type === 'opaque') return response;
+    if (!isCacheable(response)) return response;
     const cache = await caches.open(cacheName);
     cache.put(request, response.clone());
     return response;
 };
 
 async function networkFirstPage(request) {
+    if (isPrivatePath(new URL(request.url).pathname)) {
+        try {
+            return await fetch(request);
+        } catch (error) {
+            const offline = await caches.match(OFFLINE_URL, { ignoreSearch: true });
+            return offline || Response.error();
+        }
+    }
+
     try {
         const response = await fetch(request);
         // Cache the rendered page so it is available offline later.
@@ -121,6 +138,14 @@ async function cacheFirst(cacheName, request) {
 }
 
 async function networkFirstMedia(request) {
+    if (isPrivatePath(new URL(request.url).pathname)) {
+        try {
+            return await fetch(request);
+        } catch (error) {
+            return Response.error();
+        }
+    }
+
     try {
         const response = await fetch(request);
         return putIfCacheable(MEDIA_CACHE, request, response);

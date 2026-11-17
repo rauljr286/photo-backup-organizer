@@ -934,13 +934,16 @@ function initBulkSelect() {
 
             const altText = form.querySelector('[name="alt_text"]').value;
             const tags = form.querySelector('[name="tags"]').value;
-            const album = form.querySelector('[name="album"]').value;
+            const albumField = form.querySelector('[name="album"]');
+            const album = albumField ? albumField.value : '';
+            const isPrivate = form.dataset.private === '1';
 
             postJson(form.dataset.url, 'POST', {
                 ids: boxes.map((box) => box.value),
                 alt_text: altText,
                 tags,
                 album: album || null,
+                private: isPrivate,
             })
                 .then((data) => {
                     dialog.close();
@@ -1443,7 +1446,7 @@ function initServiceWorker() {
     document.addEventListener('submit', (e) => {
         const form = e.target;
         if (!(form instanceof HTMLFormElement)) return;
-        if (!/\/logout$/.test(new URL(form.action, window.location.origin).pathname)) return;
+        if (!/\/(logout|private\/lock)$/.test(new URL(form.action, window.location.origin).pathname)) return;
         const sw = navigator.serviceWorker.controller;
         if (sw) sw.postMessage({ type: 'pbo-clear-caches' });
         if (window.caches) {
@@ -2023,6 +2026,14 @@ function initDownloadSelected() {
             form.append(input);
         });
 
+        if (button.dataset.private === '1') {
+            const privateInput = document.createElement('input');
+            privateInput.type = 'hidden';
+            privateInput.name = 'private';
+            privateInput.value = '1';
+            form.append(privateInput);
+        }
+
         form.style.display = 'none';
         document.body.append(form);
         form.submit();
@@ -2212,7 +2223,7 @@ function initLandingScreen() {
         if (focusTarget) focusTarget.focus();
     };
 
-    if (cta) {
+    if (cta && cta.dataset.authenticated !== '1') {
         cta.addEventListener('click', (e) => {
             e.preventDefault();
             showAuth();

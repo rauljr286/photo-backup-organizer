@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -21,6 +22,16 @@ class WelcomePageTest extends TestCase
         $response->assertSee('Get Started', false);
         $response->assertSee('href="'.route('login').'"', false);
         $response->assertSee('Your library stays yours.', false);
+    }
+
+    public function test_the_get_started_cta_is_marked_for_authenticated_visitors(): void
+    {
+        $this->get('/')->assertDontSee('data-authenticated="1"', false);
+
+        $this->actingAs(User::factory()->create())
+            ->get('/')
+            ->assertOk()
+            ->assertSee('data-authenticated="1"', false);
     }
 
     public function test_the_landing_markup_is_not_nested_in_the_auth_shell(): void

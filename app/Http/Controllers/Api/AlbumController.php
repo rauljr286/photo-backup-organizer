@@ -137,5 +137,9 @@ class AlbumController extends Controller
         if ($photo->user_id !== $request->user()->id) {
             abort(403, 'You do not own this photo.');
         }
+
+        if ($photo->isPrivate()) {
+            abort(403, 'This photo is in the private gallery.');
+        }
     }
 }

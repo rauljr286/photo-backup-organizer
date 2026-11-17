@@ -112,20 +112,32 @@ class PhotoStorageService
         $extension = strtolower($file->getClientOriginalExtension());
         $directory = "photos/{$user->id}";
         $name = Str::uuid().'.'.$extension;
-        $path = $file->storeAs($directory, $name, $this->photoDisk());
+        $disk = $this->photoDisk();
+        $path = $file->storeAs($directory, $name, $disk);
 
-        return $this->registerStoredFile(
-            path: $path,
-            user: $user,
-            album: $album,
-            altText: $altText,
-            private: $private,
-            originalFilename: $file->getClientOriginalName(),
-            sizeBytes: $file->getSize(),
-            mimeType: $file->getMimeType(),
-            fileHash: $hash,
-            takenAt: $this->readTakenAt($file->getPathname()),
-        );
+        if (! is_string($path) || $path === '') {
+            throw new \RuntimeException('The photo could not be written to the photo disk.');
+        }
+
+        try {
+            return $this->registerStoredFile(
+                path: $path,
+                user: $user,
+                album: $album,
+                altText: $altText,
+                private: $private,
+                originalFilename: $file->getClientOriginalName(),
+                sizeBytes: $file->getSize(),
+                mimeType: $file->getMimeType(),
+                fileHash: $hash,
+                takenAt: $this->readTakenAt($file->getPathname()),
+            );
+        } catch (Throwable $e) {
+            Storage::disk($disk)->delete($path);
+            Photo::query()->where('user_id', $user->id)->where('file_path', $path)->delete();
+
+            throw $e;
+        }
     }
 
     /**
@@ -390,16 +402,16 @@ class PhotoStorageService
      * @param  array<int, string|int>  $ids
      * @return array{count: int}
      */
-    public function applyBulkUpdate(User $user, array $ids, ?string $altText, ?string $tags, ?int $albumId): array
+    public function applyBulkUpdate(User $user, array $ids, ?string $altText, ?string $tags, ?int $albumId, bool $private = false): array
     {
-        $photos = $user->photos()->whereIn('photos.id', $ids)->where('is_private', false)->get();
+        $photos = $user->photos()->whereIn('photos.id', $ids)->where('is_private', $private)->get();
 
         if ($photos->isEmpty()) {
             return ['count' => 0];
         }
 
         $normalizedTags = $this->normalizeTags($tags);
-        $album = $albumId !== null ? $user->albums()->find($albumId) : null;
+        $album = (! $private && $albumId !== null) ? $user->albums()->find($albumId) : null;
 
         foreach ($photos as $photo) {
             if ($altText !== null) {
@@ -441,10 +453,14 @@ class PhotoStorageService
             throw new \RuntimeException('Photo file missing on disk.');
         }
 
-        Storage::disk($cloudDisk)->put($remotePath, $stream);
+        $written = Storage::disk($cloudDisk)->put($remotePath, $stream);
 
         if (is_resource($stream)) {
             fclose($stream);
+        }
+
+        if ($written === false) {
+            throw new \RuntimeException('Could not write the backup to the cloud disk.');
         }
 
         $photo->remote_path = $remotePath;
@@ -593,10 +609,11 @@ class PhotoStorageService
         $added = 0;
         $disk = $this->photoDisk();
         $temporaryFiles = [];
+        $usedEntries = [];
 
         try {
             foreach ($photos as $photo) {
-                $entry = $photo->original_filename ?: basename($photo->file_path);
+                $entry = $this->zipEntryName($photo, $usedEntries);
 
                 // The archive reads the file when it is closed, so temporary
                 // copies have to stay around until then.
@@ -638,6 +655,36 @@ class PhotoStorageService
         }
 
         return $tmp;
+    }
+
+    /**
+     * Build a safe, unique ZIP entry name for a photo.
+     *
+     * @param  array<string, bool>  $used
+     */
+    protected function zipEntryName(Photo $photo, array &$used): string
+    {
+        $name = basename(str_replace('\\', '/', (string) ($photo->original_filename ?: $photo->file_path)));
+        $name = preg_replace('/[\x00-\x1F\x7F<>:"|?*\/\\\\]/u', '_', $name) ?? '';
+        $name = trim($name);
+
+        if ($name === '' || $name === '.' || $name === '..') {
+            $name = 'photo';
+        }
+
+        $extension = pathinfo($name, PATHINFO_EXTENSION);
+        $base = pathinfo($name, PATHINFO_FILENAME);
+        $candidate = $name;
+        $counter = 2;
+
+        while (isset($used[Str::lower($candidate)])) {
+            $candidate = $base.' ('.$counter.')'.($extension !== '' ? '.'.$extension : '');
+            $counter++;
+        }
+
+        $used[Str::lower($candidate)] = true;
+
+        return $candidate;
     }
 
     public function archive(Photo $photo): void
@@ -711,6 +758,13 @@ class PhotoStorageService
 
         if (! $result instanceof FileWrite) {
             return false;
+        }
+
+        $contents = Storage::disk($disk)->get($photo->file_path);
+
+        if (is_string($contents)) {
+            $photo->file_hash = hash('sha256', $contents);
+            $photo->size_bytes = strlen($contents);
         }
 
         $photo->remote_path = null;

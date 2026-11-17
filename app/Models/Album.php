@@ -27,7 +27,9 @@ class Album extends Model
      */
     public function photos(): BelongsToMany
     {
-        return $this->belongsToMany(Photo::class)->withTimestamps();
+        return $this->belongsToMany(Photo::class)
+            ->where('photos.is_private', false)
+            ->withTimestamps();
     }
 
     /**

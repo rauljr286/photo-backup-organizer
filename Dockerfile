@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libwebp-dev \
         libzip-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
-    && docker-php-ext-install -j"$(nproc)" gd exif pdo_mysql zip \
+    && docker-php-ext-install -j"$(nproc)" gd exif pdo_mysql pdo_pgsql zip \
     && a2enmod rewrite headers \
     && echo 'upload_max_filesize = 64M' > /usr/local/etc/php/conf.d/uploads.ini \
     && echo 'post_max_size = 128M' >> /usr/local/etc/php/conf.d/uploads.ini \

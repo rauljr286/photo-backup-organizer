@@ -127,7 +127,7 @@ class AlbumController extends Controller
         $this->authorizeAlbum($request, $album);
 
         $request->validate(['photo_id' => ['required', 'integer', 'exists:photos,id']]);
-        $photo = $request->user()->photos()->findOrFail($request->photo_id);
+        $photo = $request->user()->photos()->where('is_private', false)->findOrFail($request->photo_id);
 
         $album->photos()->syncWithoutDetaching($photo);
 
@@ -142,7 +142,7 @@ class AlbumController extends Controller
         $this->authorizeAlbum($request, $album);
 
         $request->validate(['photo_id' => ['required', 'integer', 'exists:photos,id']]);
-        $photo = $request->user()->photos()->findOrFail($request->photo_id);
+        $photo = $request->user()->photos()->where('is_private', false)->findOrFail($request->photo_id);
 
         $album->photos()->detach($photo);
 
